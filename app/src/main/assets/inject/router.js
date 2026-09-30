@@ -50,7 +50,7 @@
     const routes = (rules && rules.routes) || [];
     for (const route of routes) {
       const hosts = route.hosts || [];
-      const hostOk = hosts.length === 0 ? !!INSTAGRAM_HOSTS[host] : hosts.some((item) => item.toLowerCase() === host);
+      const hostOk = hosts.length === 0 ? !!INSTAGRAM_HOSTS[host] : hosts.some((item) => item.toLowerCase() === host) && (host === "instagram.com" || host.endsWith(".instagram.com"));
       if (!hostOk) continue;
       if (!new RegExp(route.pattern).test(path)) continue;
       if (route.class === "PROFILE" && reserved.has(firstSegment(path))) continue;

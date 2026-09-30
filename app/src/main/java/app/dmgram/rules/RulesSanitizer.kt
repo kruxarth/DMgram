@@ -1,6 +1,7 @@
 package app.dmgram.rules
 
 import app.dmgram.nav.Rules
+import app.dmgram.nav.isInstagramHost
 
 object RulesSanitizer {
     const val MAX_BYTES = 256 * 1024
@@ -30,6 +31,7 @@ object RulesSanitizer {
         }
         for (route in rules.routes) {
             if (route.pattern.length > 300 || !validRegex(route.pattern)) return "pattern"
+            if (route.hosts.any { !isInstagramHost(it.lowercase()) }) return "host"
         }
         return null
     }

@@ -35,6 +35,13 @@ class RulesSanitizerTest {
     }
 
     @Test
+    fun rejectsRoutesForOtherHosts() {
+        val text = """{"schema":1,"version":2,"routes":[{"class":"POST","pattern":"^/.*","hosts":["evil.example"]}]}"""
+        assertEquals("host", RulesSanitizer.rejection(text))
+        assertFalse(acceptedRemote(text, bundledVersion = 1, appVersionCode = 1))
+    }
+
+    @Test
     fun rejectsMaliciousCss() {
         assertEquals("css", RulesSanitizer.rejection(rules(css = "body{background:url(https://evil)}")))
         assertEquals("css", RulesSanitizer.rejection(rules(css = "@import 'https://evil';")))

@@ -68,7 +68,8 @@ class MediaRequests(private val activity: ComponentActivity) {
     fun onPermissionRequest(request: PermissionRequest) {
         val resources = request.resources ?: emptyArray()
         val audioOnly = resources.size == 1 && resources[0] == PermissionRequest.RESOURCE_AUDIO_CAPTURE
-        if (!audioOnly) {
+        val fromInstagram = request.origin?.scheme == "https" && request.origin?.host == "www.instagram.com"
+        if (!audioOnly || !fromInstagram) {
             request.deny()
             return
         }

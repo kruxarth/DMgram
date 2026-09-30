@@ -104,7 +104,8 @@ fun classify(raw: String, rules: CompiledRules): Classified {
     }
     val path = normalizePath(unwrapped.path)
     for (pattern in rules.patterns) {
-        val hostOk = if (pattern.hosts.isEmpty()) host in INSTAGRAM_HOSTS else host in pattern.hosts
+        // Remote rules may list hosts, but never outside instagram.com: a route decides what loads inside DMGram.
+        val hostOk = if (pattern.hosts.isEmpty()) host in INSTAGRAM_HOSTS else host in pattern.hosts && isInstagramHost(host)
         if (!hostOk) continue
         if (!pattern.regex.matches(path)) continue
         if (pattern.kind == RouteClass.PROFILE && firstSegment(path) in rules.reserved) continue
@@ -138,3 +139,5 @@ private fun unwrap(uri: URI): URI {
         uri
     }
 }
+
+internal fun isInstagramHost(host: String): Boolean = host == "instagram.com" || host.endsWith(".instagram.com")

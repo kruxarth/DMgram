@@ -600,8 +600,12 @@ class TabController(
         Log.i(DMGramApp.TAG, "Created ${tab.name} WebView")
     }
 
-    private fun rootOfSlot(slot: Slot): String? =
-        if (slot.surface == Surface.STORIES) STORIES_URL else slot.tab.rootUrl(username)
+    private fun rootOfSlot(slot: Slot): String? = when {
+        slot.surface == Surface.STORIES -> STORIES_URL
+        // Logged out, Instagram's home is a marketing page whose big button opens the official app.
+        slot.surface == Surface.FEED && !loggedIn -> LOGIN_URL
+        else -> slot.tab.rootUrl(username)
+    }
 
     private fun destroy(tab: Tab) = destroySlot(slots.getValue(tab))
 
@@ -765,7 +769,13 @@ class TabController(
         if (slot.surface == Surface.FEED) {
             eval(slot.web, "setStrip(${stripFor(slot)})")
             val now = SystemClock.uptimeMillis()
-            if (decision.route == RouteClass.HOME_FEED && !url.contains(FOLLOWING_QUERY) && loggedIn &&
+            if (decision.route == RouteClass.HOME_FEED && !LoginState.isLoggedIn() &&
+                now - followingRewriteAt > REWRITE_GAP_MS
+            ) {
+                // Logged out (first run, or after logging out): straight to the login form, not the marketing page.
+                followingRewriteAt = now
+                slot.web?.loadUrl(LOGIN_URL)
+            } else if (decision.route == RouteClass.HOME_FEED && !url.contains(FOLLOWING_QUERY) && loggedIn &&
                 now - followingRewriteAt > REWRITE_GAP_MS
             ) {
                 // Instagram's own "home" (after login, a logo link) is the ranked feed with ads. Home is Following.
@@ -1147,6 +1157,7 @@ class TabController(
         private const val KEY_TRAY_DP = "home.trayDp"
         private const val STORIES_URL = "https://www.instagram.com/"
         private const val FOLLOWING_QUERY = "variant=following"
+        private const val LOGIN_URL = "https://www.instagram.com/accounts/login/"
 
         /** Strip height before the tray was ever measured: Instagram's tray at the default font scale. */
         private const val DEFAULT_TRAY_DP = 124

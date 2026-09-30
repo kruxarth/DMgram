@@ -3,9 +3,10 @@
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import net from "node:net";
 import process from "node:process";
 
-const PORT = 9222;
+const PREFERRED_PORT = 9222;
 const PACKAGE = "app.dmgram.debug";
 const USAGE = `Usage:
   node tools/cdp.mjs targets
@@ -63,6 +64,15 @@ function ensureDevice() {
   }
 }
 
+function portFree(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => server.close(() => resolve(true)));
+    server.listen(port, "127.0.0.1");
+  });
+}
+
 function ensureForward() {
   ensureDevice();
   let pid = "";
@@ -82,17 +92,37 @@ function ensureForward() {
   if (pids.length !== 1) {
     fail(`Expected one process for ${PACKAGE}, found: ${pid}`);
   }
-  adb(["forward", "--remove", `tcp:${PORT}`], { allowFailure: true });
-  adb(["forward", `tcp:${PORT}`, `localabstract:webview_devtools_remote_${pids[0]}`]);
+  return pids[0];
 }
 
-async function listTargets() {
+async function choosePort(pid) {
+  const socket = `localabstract:webview_devtools_remote_${pid}`;
+  for (let port = PREFERRED_PORT; port < PREFERRED_PORT + 20; port++) {
+    adb(["forward", "--remove", `tcp:${port}`], { allowFailure: true });
+    if (!(await portFree(port))) continue;
+    try {
+      execFileSync("adb", ["forward", `tcp:${port}`, socket], { stdio: ["ignore", "pipe", "pipe"] });
+      if (port !== PREFERRED_PORT) {
+        console.error(`Port ${PREFERRED_PORT} is in use on this computer. Using ${port}.`);
+      }
+      return port;
+    } catch (error) {
+      const stderr = error.stderr?.toString().trim() ?? "";
+      if (!/Address already in use/i.test(stderr)) {
+        fail(`adb forward tcp:${port} ${socket} failed.\n${stderr || error.message}`);
+      }
+    }
+  }
+  fail(`Could not bind a local DevTools port from ${PREFERRED_PORT} to ${PREFERRED_PORT + 19}.`);
+}
+
+async function listTargets(port) {
   let response;
   try {
-    response = await fetch(`http://127.0.0.1:${PORT}/json`);
+    response = await fetch(`http://127.0.0.1:${port}/json`);
   } catch (error) {
     fail(
-      `Could not reach WebView DevTools on port ${PORT}. Is the debug app in the foreground?\n${error.message}`,
+      `Could not reach WebView DevTools on port ${port}. Is the debug app in the foreground?\n${error.message}`,
     );
   }
   if (!response.ok) fail(`DevTools endpoint returned HTTP ${response.status}.`);
@@ -229,8 +259,8 @@ async function main() {
     }
   }
 
-  ensureForward();
-  const targets = await listTargets();
+  const port = await choosePort(ensureForward());
+  const targets = await listTargets(port);
 
   if (command === "targets") {
     console.log(JSON.stringify(targets.map(({ id, url, visible }) => ({ id, url, visible }))));

@@ -27,4 +27,10 @@ class VersionTest {
         assertNull(SemVer.parse("1.2"))
         assertNull(SemVer.parse(""))
     }
+
+    @Test
+    fun hugeNumbersAreRejectedNotThrown() {
+        assertNull(SemVer.parse("v99999999999.0.0"))
+        assertNull(SemVer.parse("1.99999999999999999999.0"))
+    }
 }

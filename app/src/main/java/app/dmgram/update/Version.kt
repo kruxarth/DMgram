@@ -18,10 +18,11 @@ data class SemVer(
 
         fun parse(raw: String): SemVer? {
             val match = pattern.find(raw.trim()) ?: return null
+            // toIntOrNull: a tag like v99999999999.0.0 must not throw inside the update coroutine.
             return SemVer(
-                match.groupValues[1].toInt(),
-                match.groupValues[2].toInt(),
-                match.groupValues[3].toInt(),
+                match.groupValues[1].toIntOrNull() ?: return null,
+                match.groupValues[2].toIntOrNull() ?: return null,
+                match.groupValues[3].toIntOrNull() ?: return null,
             )
         }
     }

@@ -4,6 +4,7 @@ import app.dmgram.nav.CompiledRules
 import app.dmgram.nav.NavAction
 import app.dmgram.nav.Rules
 import app.dmgram.nav.decide
+import app.dmgram.nav.decideIncoming
 import app.dmgram.tabs.Tab
 import java.io.File
 import kotlinx.serialization.Serializable
@@ -28,6 +29,33 @@ class RouteTest {
                 assertEquals(fixture.url, Tab.valueOf(expectedTab), switch.tab)
             }
         }
+    }
+
+    @Test
+    fun incomingIntentsOnlyOpenContentRoutesInApp() {
+        val rules = CompiledRules(Rules.parse(repoFile("rules/rules.json").readText()))
+        for (url in listOf(
+            "https://www.instagram.com/accounts/logout/",
+            "https://www.instagram.com/accounts/edit/",
+            "https://www.instagram.com/accounts/password/reset/confirm/?uidb36=x&token=y",
+            "https://www.instagram.com/challenge/",
+            "https://www.instagram.com/api/v1/users/web_profile_info/",
+            "https://www.instagram.com/graphql/query/",
+            "https://accountscenter.instagram.com/",
+        )) {
+            val action = decideIncoming(url, rules).action
+            assertTrue("$url -> $action", action is NavAction.External)
+        }
+        for (url in listOf(
+            "https://www.instagram.com/",
+            "https://www.instagram.com/direct/inbox/",
+            "https://www.instagram.com/p/abc123/",
+            "https://www.instagram.com/some.user/",
+        )) {
+            val action = decideIncoming(url, rules).action
+            assertTrue("$url -> $action", action == NavAction.Allow || action is NavAction.Switch)
+        }
+        assertEquals(NavAction.Block("reels"), decideIncoming("https://www.instagram.com/reels/", rules).action)
     }
 
     private fun repoFile(relative: String): File =

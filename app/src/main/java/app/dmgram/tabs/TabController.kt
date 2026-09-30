@@ -30,6 +30,7 @@ import app.dmgram.nav.RouteClass
 import app.dmgram.nav.Rules
 import app.dmgram.nav.chromeFor
 import app.dmgram.nav.decide
+import app.dmgram.nav.decideIncoming
 import app.dmgram.nav.normalizePath
 import app.dmgram.rules.RulesRepository
 import app.dmgram.ui.ErrorKind
@@ -286,7 +287,7 @@ class TabController(
     }
 
     fun openIncoming(raw: String) {
-        val decision = decide(Tab.HOME, raw, compiled)
+        val decision = decideIncoming(raw, compiled)
         when (decision.route) {
             RouteClass.DIRECT_INBOX, RouteClass.DIRECT_THREAD -> {
                 if (!loggedIn) {

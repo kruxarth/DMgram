@@ -21,10 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.dmgram.R
+import app.dmgram.ui.theme.wordmarkStyle
 import app.dmgram.ui.theme.Dimens
 
 /** Instagram's home header layout: wordmark left, two actions right. The wordmark opens About. */
@@ -44,9 +44,7 @@ fun HomeHeader(
         Text(
             text = stringResource(R.string.app_name),
             color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 25.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-0.8).sp,
+            style = wordmarkStyle(26.sp),
             modifier = Modifier.clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

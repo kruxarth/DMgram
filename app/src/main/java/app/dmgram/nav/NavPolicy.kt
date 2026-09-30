@@ -33,6 +33,31 @@ fun decide(tab: Tab, rawUrl: String, rules: CompiledRules): NavDecision {
     return NavDecision(classified.route, action, classified.url)
 }
 
+/**
+ * Routes another app may open inside the logged-in WebView. MainActivity is exported, so any app can send
+ * any URL: `/accounts/logout/` alone signed the user out. Everything else on Instagram opens in the browser.
+ */
+private val INCOMING_ROUTES = setOf(
+    RouteClass.HOME_FEED,
+    RouteClass.DIRECT_INBOX,
+    RouteClass.DIRECT_THREAD,
+    RouteClass.STORY,
+    RouteClass.POST,
+    RouteClass.REEL_SINGLE,
+    RouteClass.SEARCH,
+    RouteClass.ACTIVITY,
+    RouteClass.PROFILE,
+)
+
+fun decideIncoming(rawUrl: String, rules: CompiledRules): NavDecision {
+    val decision = decide(Tab.HOME, rawUrl, rules)
+    val loadsInApp = decision.action == NavAction.Allow || decision.action is NavAction.Switch
+    if (loadsInApp && decision.route !in INCOMING_ROUTES) {
+        return decision.copy(action = NavAction.External(decision.url))
+    }
+    return decision
+}
+
 private fun actionFor(tab: Tab, classified: Classified): NavAction = when (classified.route) {
     RouteClass.EXPLORE_BLOCKED -> NavAction.Block("explore")
     RouteClass.REELS_FEED -> NavAction.Block("reels")

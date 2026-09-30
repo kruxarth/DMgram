@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.dmgram.R
+import app.dmgram.ui.theme.wordmarkStyle
 
 enum class UpdateStatus {
     Checking,
@@ -59,9 +60,7 @@ fun AboutSheet(
             Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                 Text(
                     text = stringResource(R.string.app_name),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.6).sp,
+                    style = wordmarkStyle(22.sp),
                     color = colors.onSurface,
                 )
                 Text(

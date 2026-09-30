@@ -2,6 +2,4 @@
 <resources>
     <!-- Window chrome before Compose draws. Keep in sync with ui/theme/Color.kt. -->
     <color name="window_background">#FFFFFF</color>
-    <color name="ic_launcher_background">#E1306C</color>
-    <color name="splash_mark">#000000</color>
 </resources>

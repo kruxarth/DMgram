@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Splash icon: the launcher icon itself (gradient disc + white bubble), drawn in one
-     vector because some launchers (HyperOS) ignore windowSplashScreenIconBackgroundColor.
-     The disc fills the splash's visible circle (2/3 of the 108 grid). Keep the gradient
-     in sync with ic_launcher_background.xml. -->
+<!-- Instagram-style radial gradient, rising from the bottom-left corner:
+     yellow, orange, pink, magenta, purple. The launcher crops it to its icon shape. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M54,18 A36,36 0 1,1 53.99,18 Z">
+    <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="radial"
@@ -24,10 +22,4 @@
             </gradient>
         </aapt:attr>
     </path>
-    <path
-        android:pathData="M54,33 A20,20 0 1,1 39.9,67.1 L33.5,72.5 L35.8,61.3 A20,20 0 0,1 54,33 Z"
-        android:strokeWidth="5.5"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
 </vector>

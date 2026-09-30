@@ -2,6 +2,20 @@
    Visual only: hiding for scope lives in hide.css. Selectors are structural or
    use DMGram's own data attributes, never Instagram's generated class names. */
 
+/* ---- Type: the app's font, not Roboto ----
+   Instagram's web pages already declare Meta's "Optimistic" and "Instagram Sans"
+   (served by Instagram itself) but render with the system stack. The Android app
+   uses Optimistic, so switch to it; the system stack stays as the fallback. */
+
+html,
+body,
+input,
+textarea,
+button,
+[contenteditable] {
+  font-family: "Optimistic", "Instagram Sans", -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
+}
+
 /* ---- Touch: no tap flash, no 300 ms delay, no callouts on chrome ---- */
 
 * {

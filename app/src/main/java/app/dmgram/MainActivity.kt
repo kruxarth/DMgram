@@ -13,13 +13,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -32,8 +37,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowInsetsCompat
@@ -53,6 +60,7 @@ import app.dmgram.ui.TabBar
 import app.dmgram.ui.UpdateBanner
 import app.dmgram.ui.UpdateStatus
 import app.dmgram.ui.theme.DMGramTheme
+import app.dmgram.ui.theme.Dimens
 import app.dmgram.ui.theme.windowBackground
 import app.dmgram.web.WebViewFactory
 
@@ -110,7 +118,7 @@ class MainActivity : ComponentActivity() {
         tabs.start(incoming)
         frame = tabs.snapshot()
         setContent {
-            DMGramTheme(dark = night) {
+            DMGramTheme(dark = frame.pageDark ?: night) {
                 DmgramFrame(
                     frame = frame,
                     systemDark = night,
@@ -262,7 +270,15 @@ private fun DmgramFrame(
         }
         window.decorView.setBackgroundColor(windowBackground(pageDark))
     }
-    val top = if (frame.fullScreen) Modifier else Modifier.statusBarsPadding()
+    // Full screen hides the status bar, but the camera cutout still sits on top of the page's
+    // close/back row. Clear the cutout only; the band is black like the story and reel viewers.
+    val top = if (frame.fullScreen) {
+        Modifier
+            .background(Color.Black)
+            .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top))
+    } else {
+        Modifier.statusBarsPadding()
+    }
     val bottom = when {
         frame.fullScreen -> WindowInsets(0, 0, 0, 0)
         keyboard -> WindowInsets.ime.union(WindowInsets.navigationBars)
@@ -310,15 +326,21 @@ private fun DmgramFrame(
                     TabBar(
                         current = frame.tab,
                         unread = frame.unread,
+                        avatar = frame.avatar,
                         onSelect = onSelect,
                         onReselect = onReselect,
                     )
                 }
             }
         }
-        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-            BlockedNotice(BlockedNoticeState(frame.blockedVisible))
-        }
+        // Sits just above the tab bar (or the nav bar where the tab bar is hidden).
+        BlockedNotice(
+            state = BlockedNoticeState(frame.blockedVisible),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = if (frame.showTabBar) Dimens.tabBarHeight else 0.dp),
+        )
         if (frame.aboutOpen) {
             val status = when {
                 frame.update != null -> UpdateStatus.Available

@@ -1,6 +1,7 @@
 package app.dmgram.tabs
 
 import android.content.ActivityNotFoundException
+import android.graphics.BitmapFactory
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -15,6 +16,8 @@ import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
@@ -70,6 +73,7 @@ class TabController(
     private var loggedIn = false
     private var username: String? = null
     private var homeUnread: Int? = null
+    private var avatar: ImageBitmap? = null
     private var titleUnread: Int? = null
     private var refreshing = false
     private var blockedVisible = false
@@ -113,6 +117,7 @@ class TabController(
             progress = slot.progress,
             ready = slot.ready,
             unread = homeUnread ?: titleUnread ?: 0,
+            avatar = avatar,
             refreshing = refreshing,
             blockedVisible = blockedVisible,
             aboutOpen = aboutOpen,
@@ -265,10 +270,17 @@ class TabController(
         publish()
     }
 
+    /** Instagram-like refresh spinner: text-colored arrow on the elevated surface, not Material purple. */
+    private fun styleSwipe(swipe: SwipeRefreshLayout, dark: Boolean) {
+        swipe.setColorSchemeColors(if (dark) 0xFFF5F5F5.toInt() else 0xFF262626.toInt())
+        swipe.setProgressBackgroundColorSchemeColor(if (dark) 0xFF212328.toInt() else 0xFFFFFFFF.toInt())
+    }
+
     fun setSystemDark(dark: Boolean) {
         val color = windowBackground(dark)
         for (slot in slots.values) {
             slot.web?.setBackgroundColor(color)
+            slot.swipe?.let { styleSwipe(it, dark) }
             eval(slot.web, "setSystemDark($dark)")
         }
     }
@@ -385,6 +397,10 @@ class TabController(
         val dark = isDark()
         val web = WebView(activity)
         web.setBackgroundColor(windowBackground(dark))
+        // Native apps don't show a scroll thumb or an edge glow on their feeds.
+        web.isVerticalScrollBarEnabled = false
+        web.isHorizontalScrollBarEnabled = false
+        web.overScrollMode = View.OVER_SCROLL_NEVER
         web.layoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -430,6 +446,7 @@ class TabController(
             FrameLayout.LayoutParams.MATCH_PARENT,
         )
         swipe.addView(web)
+        styleSwipe(swipe, dark)
         swipe.setOnRefreshListener { onPull(slot) }
         swipe.setOnChildScrollUpCallback { _, _ -> !slot.atTop }
         container.addView(swipe)
@@ -493,9 +510,18 @@ class TabController(
                 if (slot.tab == Tab.HOME) homeUnread = event.count.coerceAtLeast(0)
             }
             is BridgeEvent.Username -> onUsername(event.value)
+            is BridgeEvent.Avatar -> {
+                if (slot.tab == Tab.HOME) {
+                    val bitmap = BitmapFactory.decodeByteArray(event.jpeg, 0, event.jpeg.size)
+                    if (bitmap != null && bitmap.width in 1..256 && bitmap.height in 1..256) {
+                        avatar = bitmap.asImageBitmap()
+                    }
+                }
+            }
             is BridgeEvent.Theme -> {
                 if (slot.tab == current) pageDark = event.dark
                 slot.web?.setBackgroundColor(cssColor(event.background, event.dark))
+                slot.swipe?.let { styleSwipe(it, event.dark) }
             }
             is BridgeEvent.Scroll -> slot.atTop = event.atTop
             BridgeEvent.Ready -> {
@@ -725,6 +751,7 @@ class TabController(
             Log.i(DMGramApp.TAG, "Logged out")
             username = null
             homeUnread = null
+            avatar = null
             prefs.edit().remove(KEY_USERNAME).apply()
             destroy(Tab.DMS)
             destroy(Tab.PROFILE)

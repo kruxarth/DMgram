@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- DMGram mark: a single line-drawn speech bubble. No Instagram marks.
-     Kept inside the 66 dp adaptive-icon safe zone. Also the monochrome (themed) layer. -->
+     Kept inside the 66 dp adaptive-icon safe zone. Splash variant: the stroke follows the theme so it shows on the plain splash background. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -9,7 +9,7 @@
     <path
         android:pathData="M54,33 A20,20 0 1,1 39.9,67.1 L33.5,72.5 L35.8,61.3 A20,20 0 0,1 54,33 Z"
         android:strokeWidth="5.5"
-        android:strokeColor="#FFFFFF"
+        android:strokeColor="@color/splash_mark"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
 </vector>

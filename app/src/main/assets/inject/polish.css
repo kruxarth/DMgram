@@ -1,0 +1,111 @@
+/* DMGram UX layer. Makes Instagram's mobile web feel like a native app.
+   Visual only: hiding for scope lives in hide.css. Selectors are structural or
+   use DMGram's own data attributes, never Instagram's generated class names. */
+
+/* ---- Touch: no tap flash, no 300 ms delay, no callouts on chrome ---- */
+
+* {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+a,
+button,
+label,
+input,
+[role="button"],
+[role="link"],
+[role="tab"] {
+  touch-action: manipulation;
+}
+
+/* UI chrome can't be selected or long-pressed. Message and caption text still can. */
+a,
+button,
+svg,
+img,
+header,
+nav,
+[role="button"],
+[role="link"],
+[role="tab"],
+[role="tablist"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ---- Scrolling: no rubber-band on the page, no scrollbars ---- */
+
+html,
+body {
+  overscroll-behavior: none;
+}
+
+* {
+  scrollbar-width: none;
+}
+
+::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* ---- Focus: no rings on taps. Text fields keep their caret. ---- */
+
+:focus,
+:focus-visible {
+  outline: none !important;
+}
+
+/* ---- Gaps left by hidden Instagram chrome ---- */
+
+/* The bottom nav sits in a chain of fixed-height wrappers (a 50 px strip at the
+   bottom). Collapse every wrapper whose only content is the nav, up to 5 levels. */
+:has(> [data-dmgram-chrome="nav"]:only-child),
+:has(> :only-child > [data-dmgram-chrome="nav"]:only-child),
+:has(> :only-child > :only-child > [data-dmgram-chrome="nav"]:only-child),
+:has(> :only-child > :only-child > :only-child > [data-dmgram-chrome="nav"]:only-child),
+:has(> :only-child > :only-child > :only-child > :only-child > [data-dmgram-chrome="nav"]:only-child) {
+  display: none !important;
+}
+
+/* "Use the app" bar: a close control and one button, nothing else. Matched by shape
+   so it never flashes while cleanup.js is still scanning a fresh render. */
+div:has(> div > button[data-dmgram-hidden]):has(> div > [role="button"] svg),
+div:has(> div:first-child > [role="button"]:only-child svg):has(> div:last-child > button:only-child):not(:has(> :nth-child(3))) {
+  display: none !important;
+}
+
+/* DMs is a tab, not a page: its root has nothing to go back to. */
+html[data-dmgram-path="/direct/inbox/"] [role="button"]:has(svg[aria-label="Back"]) {
+  display: none !important;
+}
+
+/* Instagram's home header is hidden in hide.css; its nav wrapper still holds 45 px. */
+nav:has(header a[href="/notifications/"]) {
+  display: none !important;
+}
+
+/* Threads shortcut on your own profile: a jump to another app, not part of DMGram. */
+a[href*="threads.com"],
+a[href*="threads.net"] {
+  display: none !important;
+}
+
+/* ---- Home feed end ---- */
+
+/* After "You're all caught up" nothing else loads, so a spinner under it would
+   look like a stuck page. The feed simply ends at the check mark. */
+html[data-dmgram-path="/"][data-dmgram-caught] [role="progressbar"],
+html[data-dmgram-path="/"][data-dmgram-caught] :has(> [role="progressbar"]:only-child) {
+  display: none !important;
+}
+
+/* ---- Loading ---- */
+
+/* Instagram's web splash (logo, "from Meta"). Keep its themed background as a
+   blank cover until first paint; DMGram's splash and 2 dp bar do the talking. */
+#splash-screen > * {
+  visibility: hidden !important;
+}

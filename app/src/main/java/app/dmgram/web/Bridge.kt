@@ -21,6 +21,7 @@ sealed interface BridgeEvent {
     data class Blocked(val url: String, val reason: String) : BridgeEvent
     data class Unread(val count: Int) : BridgeEvent
     data class Username(val value: String) : BridgeEvent
+    class Avatar(val jpeg: ByteArray) : BridgeEvent
     data class Theme(val dark: Boolean, val background: String) : BridgeEvent
     data class Scroll(val atTop: Boolean) : BridgeEvent
     data object Ready : BridgeEvent
@@ -82,6 +83,7 @@ object Bridge {
             }
             "unread" -> obj["count"]?.jsonPrimitive?.intOrNull?.let(BridgeEvent::Unread)
             "username" -> text(obj, "value", 30)?.let(BridgeEvent::Username)
+            "avatar" -> obj["data"]?.jsonPrimitive?.contentOrNull?.let(AvatarData::decode)?.let(BridgeEvent::Avatar)
             "theme" -> {
                 val dark = obj["dark"]?.jsonPrimitive?.booleanOrNull ?: return null
                 BridgeEvent.Theme(dark, text(obj, "background", 80) ?: "")

@@ -107,7 +107,8 @@ function openSearch() {
   const focus = () => {
     const path = (location.pathname || "/").replace(/\/$/, "") || "/";
     if (path === "/explore") {
-      history.pushState({}, "", "/explore/search/");
+      // Replace, not push: /explore/ must never be a back target.
+      history.replaceState({}, "", "/explore/search/");
       window.dispatchEvent(new PopStateEvent("popstate"));
     }
     const input = document.querySelector('input[type="search"]');
@@ -205,6 +206,9 @@ let lastTheme = "";
 function publishTheme() {
   const root = document.documentElement;
   if (!root) return;
+  // Until Instagram picks a mode, the page is unstyled white. Reporting that would flash light
+  // native chrome over a dark page; native follows the system (as Instagram does) until then.
+  if (!root.classList.contains("__fb-dark-mode") && !root.classList.contains("__fb-light-mode")) return;
   const dark = root.classList.contains("__fb-dark-mode");
   const background = getComputedStyle(document.body || root).backgroundColor || "";
   const key = (dark ? "1" : "0") + background;
@@ -235,6 +239,30 @@ function publishUsername() {
     window.__dmgramPost({ type: "username", value: match[1] });
     return;
   }
+}
+
+// Your avatar for the native Profile tab. The image is already on the page (Instagram's hidden
+// tab bar), so this reads the cached copy; it never asks for anything the page didn't load.
+// Downscaled to 96 px so the message stays small. One attempt per image URL.
+let avatarSrc = "";
+function publishAvatar() {
+  if (CONFIG.tab !== "HOME" || !lastUsername) return;
+  const img = document.querySelector('a[href="/' + lastUsername + '/"] img');
+  if (!img || !img.complete || !img.naturalWidth) return;
+  const src = img.currentSrc || img.src;
+  if (!src || src === avatarSrc) return;
+  avatarSrc = src;
+  fetch(src, { cache: "force-cache", credentials: "omit" })
+    .then((res) => (res.ok ? res.blob() : Promise.reject(new Error("status " + res.status))))
+    .then((blob) => createImageBitmap(blob))
+    .then((bitmap) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 96;
+      canvas.height = 96;
+      canvas.getContext("2d").drawImage(bitmap, 0, 0, 96, 96);
+      window.__dmgramPost({ type: "avatar", data: canvas.toDataURL("image/jpeg", 0.8) });
+    })
+    .catch((error) => dmgramLog("info", "avatar skipped " + error));
 }
 
 let lastUnread = null;
@@ -290,6 +318,7 @@ function scheduleScan() {
     scanScheduled = false;
     publishTheme();
     publishUsername();
+    publishAvatar();
     publishUnread();
     publishReady();
   });

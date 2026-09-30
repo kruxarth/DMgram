@@ -1,5 +1,6 @@
 package app.dmgram.tabs
 
+import androidx.compose.ui.graphics.ImageBitmap
 import app.dmgram.ui.ErrorKind
 import app.dmgram.update.UpdateInfo
 
@@ -13,6 +14,7 @@ data class FrameUi(
     val progress: Int = 0,
     val ready: Boolean = false,
     val unread: Int = 0,
+    val avatar: ImageBitmap? = null,
     val refreshing: Boolean = false,
     val blockedVisible: Boolean = false,
     val aboutOpen: Boolean = false,

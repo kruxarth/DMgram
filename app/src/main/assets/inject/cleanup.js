@@ -53,7 +53,10 @@ function hideNag(el) {
   hide(el.closest("button, [role='button'], a") || el);
 }
 
+let caughtMarker = null;
+
 function cutAfter(marker) {
+  caughtMarker = marker;
   document.documentElement.setAttribute("data-dmgram-caught", "");
   let node = marker;
   for (let depth = 0; depth < 6 && node && node.parentElement && node !== document.body; depth += 1) {
@@ -102,21 +105,25 @@ function classify(el) {
   if (label && markerList("follow").has(label)) maybeHideUnfollowed(el);
 }
 
-let chromeMarked = false;
+let chromeEl = null;
 
+// Instagram re-renders its bottom nav per route, and the Search variant has no Reels link.
+// Mark the smallest bar that holds both Home and Inbox, outside the page header, again whenever the old one is gone.
 function markChrome() {
-  if (chromeMarked) return;
-  const link = document.querySelector('a[href="/reels/"], a[href="/reels"]');
-  if (!link) return;
-  let el = link.parentElement;
-  for (let depth = 0; depth < 5 && el && el !== document.body; depth += 1) {
-    if (el.childElementCount > 24) break;
-    if (el.querySelector('a[href="/direct/inbox/"], a[href="/direct/inbox"]')) {
-      el.setAttribute("data-dmgram-chrome", "nav");
-      chromeMarked = true;
-      return;
+  if (chromeEl && chromeEl.isConnected) return;
+  chromeEl = null;
+  for (const link of document.querySelectorAll('a[href="/direct/inbox/"], a[href="/direct/inbox"]')) {
+    if (link.closest("header")) continue;
+    let el = link.parentElement;
+    for (let depth = 0; depth < 8 && el && el !== document.body; depth += 1) {
+      if (el.childElementCount > 24) break;
+      if (el.querySelector('a[href="/"]')) {
+        el.setAttribute("data-dmgram-chrome", "nav");
+        chromeEl = el;
+        return;
+      }
+      el = el.parentElement;
     }
-    el = el.parentElement;
   }
 }
 
@@ -126,6 +133,8 @@ function caught() {
 
 function hideFreshArticle(article) {
   if (!article || article.hasAttribute("data-dmgram-hidden")) return;
+  // Instagram mounts and re-mounts posts above the marker late too. Only posts below it are past "caught up".
+  if (caughtMarker && caughtMarker.isConnected && !(caughtMarker.compareDocumentPosition(article) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
   hide(article);
 }
 
@@ -213,6 +222,7 @@ function scanNode(node) {
 
 function flush() {
   scheduled = false;
+  markChrome();
   const started = performance.now();
   let processed = 0;
   while (pendingAt < pending.length && processed < 5 && performance.now() - started < 1) {
@@ -294,11 +304,10 @@ window.__dmgramApplyRules = applyRemoteRules;
 applyRemoteRules();
 
 function scheduleChrome() {
-  if (chromeMarked) return;
   setTimeout(() => {
     markChrome();
-    if (!chromeMarked) scheduleChrome();
-  }, 400);
+    scheduleChrome();
+  }, 500);
 }
 
 const cleanupObserver = new MutationObserver((records) => {

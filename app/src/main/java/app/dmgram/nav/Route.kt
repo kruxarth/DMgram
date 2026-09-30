@@ -27,9 +27,21 @@ enum class RouteClass {
 }
 
 @Serializable
+data class HideRule(
+    val id: String = "",
+    val selector: String = "",
+    val note: String = "",
+)
+
+@Serializable
 data class Rules(
+    val schema: Int = 1,
+    val version: Int = 0,
+    val minAppVersionCode: Int = 1,
     val routes: List<RoutePattern> = emptyList(),
     val reserved: List<String> = emptyList(),
+    val hide: List<HideRule> = emptyList(),
+    val css: String = "",
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true }

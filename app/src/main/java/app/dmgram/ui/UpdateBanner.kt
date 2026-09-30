@@ -13,11 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import app.dmgram.R
 import app.dmgram.ui.theme.Dimens
-
-data class UpdateInfo(
-    val versionName: String,
-    val notes: String,
-)
+import app.dmgram.update.UpdateInfo
 
 @Composable
 fun UpdateBanner(
@@ -31,7 +27,10 @@ fun UpdateBanner(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.stackGap),
         ) {
-            Text(text = info.versionName, modifier = Modifier.weight(1f))
+            Text(
+                text = stringResource(R.string.update_available, info.version),
+                modifier = Modifier.weight(1f),
+            )
             TextButton(onClick = onInstall) {
                 Text(stringResource(R.string.update_install))
             }

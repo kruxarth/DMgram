@@ -341,3 +341,15 @@ One solid red test image was sent in `/direct/t/1000000000000001/` at 1:53 PM. T
 **Fullscreen and downloads.** No HTML5 fullscreen control exists (Q17). `onShowCustomView` / `onHideCustomView` are implemented and were not entered. A download was not triggered; the listener opens the URL in a Custom Tab.
 
 **Trial text.** At the user's request, the message `trial` was sent to a friend (`friend_d`, `/direct/t/1000000000000002/`) at 2:02 PM. No text was sent to the test thread.
+
+## Phase 5 (30 Sep 2026)
+
+`dmgram.githubRepo` is empty in `gradle.properties`, so a normal debug build logs "Rules fetch skipped: no GitHub repo" and "Update check skipped: no GitHub repo". About then shows rules version 1 and "Up to date", with no GitHub row.
+
+A debug build pointed at a local server (`-Pdmgram.rulesUrl` and `-Pdmgram.updatesUrl`, not committed) did both of these without a reinstall between the two rule files:
+
+- Rules version 2 hid `[aria-label="Plus icon"]` (`display: none` on the plus badge).
+- After the served file was changed to version 3 and the app was force-stopped, the new rule hid `[aria-label^="Story by"]`. The bundled rules stayed version 1.
+- The banner read "Update available · v9.9.9". About showed rules version 3, "Update available", Install, GitHub, and Report a problem. Install opened Firefox at `http://127.0.0.1:8000/DMGram-v9.9.9.apk`, and the local server logged that GET.
+
+The default APK was installed again afterward. Stories and the plus badge are visible, and the banner is gone. A main-frame error page was not provoked.

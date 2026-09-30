@@ -1,5 +1,8 @@
 package app.dmgram.tabs
 
+import app.dmgram.ui.ErrorKind
+import app.dmgram.update.UpdateInfo
+
 data class FrameUi(
     val tab: Tab = Tab.HOME,
     val loggedIn: Boolean = false,
@@ -14,4 +17,9 @@ data class FrameUi(
     val blockedVisible: Boolean = false,
     val aboutOpen: Boolean = false,
     val pageDark: Boolean? = null,
+    val rulesVersion: Int = 1,
+    val update: UpdateInfo? = null,
+    val updateDismissed: Boolean = false,
+    val checkingUpdate: Boolean = false,
+    val loadError: ErrorKind? = null,
 )

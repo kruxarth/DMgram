@@ -18,6 +18,9 @@ android {
         targetSdk = 37
         versionCode = providers.gradleProperty("versionCode").get().toInt()
         versionName = providers.gradleProperty("versionName").get()
+        buildConfigField("String", "GITHUB_REPO", dmgramConfig("dmgram.githubRepo"))
+        buildConfigField("String", "RULES_URL", dmgramConfig("dmgram.rulesUrl"))
+        buildConfigField("String", "UPDATES_URL", dmgramConfig("dmgram.updatesUrl"))
     }
 
     buildTypes {
@@ -66,6 +69,14 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.okhttp)
 
     testImplementation(libs.junit)
+}
+
+fun dmgramConfig(name: String): String {
+    val value = providers.gradleProperty(name).orElse("").get()
+    val escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
+    return "\"$escaped\""
 }

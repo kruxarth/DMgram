@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +50,8 @@ import app.dmgram.ui.ErrorState
 import app.dmgram.ui.HomeHeader
 import app.dmgram.ui.LoadingOverlay
 import app.dmgram.ui.TabBar
+import app.dmgram.ui.UpdateBanner
+import app.dmgram.ui.UpdateStatus
 import app.dmgram.ui.theme.DMGramTheme
 import app.dmgram.ui.theme.windowBackground
 import app.dmgram.web.WebViewFactory
@@ -118,6 +122,11 @@ class MainActivity : ComponentActivity() {
                     onSearch = tabs::openSearch,
                     onActivity = tabs::openActivity,
                     onDismissAbout = tabs::dismissAbout,
+                    onInstall = tabs::installUpdate,
+                    onDismissUpdate = tabs::dismissUpdate,
+                    onGitHub = tabs::openGitHub,
+                    onReport = tabs::openReport,
+                    onRetry = tabs::retryLoad,
                 )
             }
         }
@@ -229,6 +238,11 @@ private fun DmgramFrame(
     onSearch: () -> Unit,
     onActivity: () -> Unit,
     onDismissAbout: () -> Unit,
+    onInstall: () -> Unit,
+    onDismissUpdate: () -> Unit,
+    onGitHub: () -> Unit,
+    onReport: () -> Unit,
+    onRetry: () -> Unit,
 ) {
     val view = LocalView.current
     val density = LocalDensity.current
@@ -257,6 +271,10 @@ private fun DmgramFrame(
     }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().then(top)) {
+            val update = frame.update
+            if (frame.showHomeHeader && update != null && !frame.updateDismissed) {
+                UpdateBanner(update, onInstall, onDismissUpdate)
+            }
             if (frame.showHomeHeader) {
                 HomeHeader(
                     onTitleClick = onTitle,
@@ -277,6 +295,15 @@ private fun DmgramFrame(
                     modifier = Modifier.fillMaxSize(),
                 )
                 LoadingOverlay(progress = frame.progress, ready = frame.ready)
+                val error = frame.loadError
+                if (error != null) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background,
+                    ) {
+                        ErrorState(error, onRetry)
+                    }
+                }
             }
             if (frame.showTabBar) {
                 Box(modifier = Modifier.navigationBarsPadding()) {
@@ -293,12 +320,23 @@ private fun DmgramFrame(
             BlockedNotice(BlockedNoticeState(frame.blockedVisible))
         }
         if (frame.aboutOpen) {
+            val status = when {
+                frame.update != null -> UpdateStatus.Available
+                frame.checkingUpdate -> UpdateStatus.Checking
+                else -> UpdateStatus.UpToDate
+            }
             AboutSheet(
                 state = AboutState(
                     versionName = BuildConfig.VERSION_NAME,
                     versionCode = BuildConfig.VERSION_CODE,
+                    rulesVersion = frame.rulesVersion,
+                    status = status,
+                    githubRepo = BuildConfig.GITHUB_REPO,
                 ),
                 onDismiss = onDismissAbout,
+                onInstall = onInstall,
+                onGitHub = onGitHub,
+                onReport = onReport,
             )
         }
     }

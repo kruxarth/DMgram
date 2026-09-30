@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -16,6 +17,7 @@ import androidx.activity.ComponentActivity
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.webkit.ScriptHandler
+import androidx.webkit.WebViewCompat
 import app.dmgram.BuildConfig
 import app.dmgram.DMGramApp
 import app.dmgram.nav.Chrome
@@ -26,6 +28,11 @@ import app.dmgram.nav.Rules
 import app.dmgram.nav.chromeFor
 import app.dmgram.nav.decide
 import app.dmgram.nav.normalizePath
+import app.dmgram.rules.RulesRepository
+import app.dmgram.ui.ErrorKind
+import app.dmgram.update.AboutLinks
+import app.dmgram.update.UpdateChecker
+import app.dmgram.update.UpdateInfo
 import app.dmgram.ui.theme.windowBackground
 import app.dmgram.web.Bridge
 import app.dmgram.web.BridgeEvent
@@ -37,6 +44,12 @@ import app.dmgram.web.WebViewFactory
 import app.dmgram.web.jsQuote
 import java.net.URI
 import java.net.URISyntaxException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class TabController(
     private val activity: ComponentActivity,
@@ -46,6 +59,9 @@ class TabController(
     private val onChanged: () -> Unit,
 ) {
     private val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val jobs = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val rulesRepository = RulesRepository(activity, prefs)
+    private val updateChecker = UpdateChecker(prefs)
     private val main = Handler(Looper.getMainLooper())
     private val slots = Tab.entries.associateWith { Slot(it) }
     private var rulesJson: String = "{}"
@@ -60,6 +76,11 @@ class TabController(
     private var aboutOpen = false
     private var pageDark: Boolean? = null
     private var keyboardOpen = false
+    private var remoteJob: Job? = null
+    private var rulesVersion = 1
+    private var updateInfo: UpdateInfo? = null
+    private var updateDismissed = false
+    private var checkingUpdate = false
     private var foreground = true
     private var homeLoaded = false
     private var blockedAt = 0L
@@ -69,8 +90,10 @@ class TabController(
 
     fun start(incoming: String?) {
         username = prefs.getString(KEY_USERNAME, null)?.takeIf { usernamePattern.matches(it) }
-        rulesJson = loadRules()
-        compiled = CompiledRules(Rules.parse(rulesJson))
+        rulesJson = rulesRepository.bundled()
+        val parsed = Rules.parse(rulesJson)
+        compiled = CompiledRules(parsed)
+        rulesVersion = parsed.version
         loggedIn = LoginState.isLoggedIn()
         create(Tab.HOME, load = true)
         if (!incoming.isNullOrBlank()) openIncoming(incoming)
@@ -94,6 +117,11 @@ class TabController(
             blockedVisible = blockedVisible,
             aboutOpen = aboutOpen,
             pageDark = pageDark,
+            rulesVersion = rulesVersion,
+            update = updateInfo,
+            updateDismissed = updateDismissed,
+            checkingUpdate = checkingUpdate,
+            loadError = slot.loadError,
         )
     }
 
@@ -180,6 +208,49 @@ class TabController(
         publish()
     }
 
+    fun dismissUpdate() {
+        val version = updateInfo?.version ?: return
+        prefs.edit().putString(KEY_UPDATE_DISMISSED, version).apply()
+        updateDismissed = true
+        publish()
+    }
+
+    fun installUpdate() {
+        val info = updateInfo ?: return
+        try {
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl)))
+        } catch (error: ActivityNotFoundException) {
+            Log.e(DMGramApp.TAG, "No handler for the update ${info.version}", error)
+        }
+    }
+
+    fun openGitHub() {
+        val repo = BuildConfig.GITHUB_REPO
+        if (repo.isBlank()) return
+        openExternal(AboutLinks.repoUrl(repo))
+    }
+
+    fun openReport() {
+        val repo = BuildConfig.GITHUB_REPO
+        if (repo.isBlank()) return
+        val body = AboutLinks.reportBody(
+            appVersion = BuildConfig.VERSION_NAME,
+            versionCode = BuildConfig.VERSION_CODE,
+            rulesVersion = rulesVersion,
+            androidVersion = Build.VERSION.RELEASE ?: "",
+            webViewVersion = webViewVersion(),
+        )
+        openExternal(AboutLinks.reportUrl(repo, body))
+    }
+
+    fun retryLoad() {
+        val slot = slots.getValue(current)
+        slot.loadError = null
+        val web = slot.web
+        if (web == null) create(current, load = true) else web.reload()
+        publish()
+    }
+
     fun openSearch() {
         eval(slots.getValue(current).web, "openSearch()")
     }
@@ -249,10 +320,12 @@ class TabController(
             }
         }
         refreshLogin()
+        refreshRemote()
     }
 
     fun onHostStop() {
         foreground = false
+        remoteJob?.cancel()
         for (slot in slots.values) {
             try {
                 slot.web?.onPause()
@@ -275,6 +348,7 @@ class TabController(
     }
 
     fun destroyAll() {
+        jobs.cancel()
         hideNotice?.let { main.removeCallbacks(it) }
         for (tab in Tab.entries) destroy(tab)
     }
@@ -335,6 +409,16 @@ class TabController(
             onRendererGone = { onRendererGone(web) },
             onOverrideUrl = { url -> onOverride(slot, url) },
             onPageFinished = { url -> onFinished(slot, url) },
+            onPageStarted = {
+                if (slot.loadError != null) {
+                    slot.loadError = null
+                    publish()
+                }
+            },
+            onMainFrameError = { offline ->
+                slot.loadError = if (offline) ErrorKind.OFFLINE else ErrorKind.LOAD
+                publish()
+            },
         )
         Bridge.attach(web) { event ->
             activity.runOnUiThread { onBridge(slot, event) }
@@ -729,11 +813,78 @@ class TabController(
         }
     }
 
-    private fun loadRules(): String = try {
-        activity.assets.open("rules.default.json").bufferedReader().use { it.readText() }
-    } catch (error: java.io.IOException) {
-        Log.e(DMGramApp.TAG, "Bundled rules are missing", error)
-        """{"routes":[],"reserved":[]}"""
+    private fun refreshRemote() {
+        if (!foreground) return
+        remoteJob?.cancel()
+        val dismissed = prefs.getString(KEY_UPDATE_DISMISSED, null)
+        updateInfo = if (updateChecker.url() == null) null else updateChecker.saved()
+        updateDismissed = updateInfo?.version == dismissed
+        checkingUpdate = updateChecker.url() != null && updateChecker.due() && updateInfo == null
+        publish()
+        remoteJob = jobs.launch {
+            val bundled = rulesRepository.bundled()
+            val bundledVersion = try {
+                Rules.parse(bundled).version
+            } catch (error: IllegalArgumentException) {
+                Log.e(DMGramApp.TAG, "Bundled rules failed to parse", error)
+                0
+            }
+            if (rulesRepository.url() == null) {
+                Log.i(DMGramApp.TAG, "Rules fetch skipped: no GitHub repo")
+                rulesRepository.discardCache()
+            } else {
+                val cached = rulesRepository.cached(bundledVersion, BuildConfig.VERSION_CODE)
+                if (cached != null) applyIncoming(cached)
+                if (foreground && rulesRepository.due()) {
+                    val remote = rulesRepository.fetch(bundledVersion, BuildConfig.VERSION_CODE)
+                    if (remote != null) applyIncoming(remote)
+                }
+            }
+            if (!foreground) return@launch
+            if (updateChecker.url() == null) {
+                Log.i(DMGramApp.TAG, "Update check skipped: no GitHub repo")
+                updateChecker.save(null)
+                updateInfo = null
+                updateDismissed = false
+                checkingUpdate = false
+                publish()
+                return@launch
+            }
+            if (!updateChecker.due()) {
+                checkingUpdate = false
+                publish()
+                return@launch
+            }
+            val info = updateChecker.fetch(BuildConfig.VERSION_NAME)
+            if (!foreground) return@launch
+            updateChecker.save(info)
+            updateInfo = info
+            updateDismissed = info != null && info.version == prefs.getString(KEY_UPDATE_DISMISSED, null)
+            checkingUpdate = false
+            if (info != null) Log.i(DMGramApp.TAG, "Update available ${info.version}")
+            publish()
+        }
+    }
+
+    private fun applyIncoming(json: String) {
+        val version = try {
+            Rules.parse(json).version
+        } catch (error: IllegalArgumentException) {
+            Log.e(DMGramApp.TAG, "Remote rules failed to parse", error)
+            return
+        }
+        rulesVersion = version
+        if (json == rulesJson) return
+        Log.i(DMGramApp.TAG, "Applying rules version $version")
+        applyRules(json)
+        publish()
+    }
+
+    private fun webViewVersion(): String = try {
+        WebViewCompat.getCurrentWebViewPackage(activity)?.versionName ?: "unknown"
+    } catch (error: RuntimeException) {
+        Log.e(DMGramApp.TAG, "WebView version unavailable", error)
+        "unknown"
     }
 
     private fun cssColor(value: String, dark: Boolean): Int {
@@ -773,11 +924,13 @@ class TabController(
         var reelLocked: Boolean = false
         var fullscreenVideo: Boolean = false
         var rewinding: Boolean = false
+        var loadError: ErrorKind? = null
     }
 
     companion object {
         private const val PREFS = "dmgram"
         private const val KEY_USERNAME = "username"
+        private const val KEY_UPDATE_DISMISSED = "update.dismissed"
         private const val NOTICE_MS = 2_000L
         private const val BLOCK_GAP_MS = 3_000L
     }

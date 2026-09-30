@@ -22,20 +22,20 @@ function refreshMarkers() {
 function conceal(node) {
   if (!node || node.nodeType !== 1 || node === document.body || node === document.documentElement) return;
   if (node.tagName === "MAIN" || node.tagName === "HEADER" || node.tagName === "HTML") return;
-  if (node.querySelector && node.querySelector("a[href='/reels/'], a[href='/reels']") && node.querySelector("article")) return;
   if (node.hasAttribute("data-dmgram-hidden")) return;
   node.setAttribute("data-dmgram-hidden", "");
 }
 
 function hide(node) {
   if (!node || node.nodeType !== 1) return;
-  if (node.querySelectorAll && node.querySelectorAll("article").length > 1) return;
   conceal(node);
 }
 
 function shortText(el) {
-  if (!el || el.nodeType !== 1 || el.childElementCount > 4) return "";
-  const text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+  if (!el || el.nodeType !== 1 || el.childElementCount > 0) return "";
+  const raw = el.firstChild && el.firstChild.nodeType === 3 ? el.firstChild.data : "";
+  if (!raw || raw.length > 48) return "";
+  const text = raw.replace(/\s+/g, " ").trim();
   if (!text || text.length > 48) return "";
   return text;
 }
@@ -46,59 +46,26 @@ function hideUnit(el) {
     hide(article);
     return;
   }
-  let node = el;
-  let chosen = el;
-  for (let depth = 0; depth < 8 && node.parentElement && node.parentElement !== document.body; depth += 1) {
-    const parent = node.parentElement;
-    if (parent.tagName === "MAIN" || parent.tagName === "HEADER") break;
-    if (parent.querySelectorAll("article").length > 1) break;
-    const rect = parent.getBoundingClientRect();
-    if (rect.height > 520) break;
-    if (holdsCaughtUp(parent)) break;
-    chosen = parent;
-    node = parent;
-  }
-  if (holdsCaughtUp(chosen)) {
-    hide(el);
-    return;
-  }
-  hide(chosen);
-}
-
-function holdsCaughtUp(node) {
-  if (!node || !node.querySelectorAll) return false;
-  const labels = markerList("caughtUp");
-  for (const el of node.querySelectorAll("span, h1, h2, h3")) {
-    if (labels.has(shortText(el))) return true;
-  }
-  return false;
+  hide(el.closest("button, [role='button'], a, h1, h2, h3") || el);
 }
 
 function hideNag(el) {
-  let node = el;
-  for (let depth = 0; depth < 6 && node && node !== document.body; depth += 1) {
-    const rect = node.getBoundingClientRect();
-    const style = getComputedStyle(node);
-    if (rect.height >= 24 && rect.height <= 120 && (style.position === "fixed" || style.position === "sticky")) {
-      hide(node);
-      return;
-    }
-    node = node.parentElement;
-  }
   hide(el.closest("button, [role='button'], a") || el);
 }
 
 function cutAfter(marker) {
   document.documentElement.setAttribute("data-dmgram-caught", "");
   let node = marker;
-  for (let depth = 0; depth < 10 && node && node.parentElement && node !== document.body; depth += 1) {
+  for (let depth = 0; depth < 6 && node && node.parentElement && node !== document.body; depth += 1) {
     let sibling = node.nextElementSibling;
-    while (sibling) {
+    let guard = 0;
+    while (sibling && guard < 8) {
       conceal(sibling);
       sibling = sibling.nextElementSibling;
+      guard += 1;
     }
     const parent = node.parentElement;
-    if (parent.scrollHeight > window.innerHeight * 1.2) break;
+    if (sibling || parent.childElementCount > 8) break;
     node = parent;
   }
 }
@@ -107,10 +74,9 @@ function maybeHideUnfollowed(el) {
   const follow = markerList("follow");
   const control = el.closest("button, [role='button']");
   if (!control || !follow.has(shortText(control))) return;
-  const article = control.closest("article");
+  const header = control.closest("header");
+  const article = header && header.closest("article");
   if (!article) return;
-  const top = control.getBoundingClientRect().top - article.getBoundingClientRect().top;
-  if (top < 0 || top > 180) return;
   hide(article);
 }
 
@@ -126,7 +92,7 @@ function classify(el) {
     return;
   }
   if ((label && markerList("caughtUp").has(label)) || markerList("caughtUp").has(named)) {
-    cutAfter(el);
+    if (!caught()) cutAfter(el);
     return;
   }
   if (label && (markerList("sponsored").has(label) || markerList("suggested").has(label))) {
@@ -136,64 +102,144 @@ function classify(el) {
   if (label && markerList("follow").has(label)) maybeHideUnfollowed(el);
 }
 
+let chromeMarked = false;
+
 function markChrome() {
+  if (chromeMarked) return;
   const link = document.querySelector('a[href="/reels/"], a[href="/reels"]');
   if (!link) return;
   let el = link.parentElement;
-  for (let depth = 0; depth < 8 && el && el !== document.body; depth += 1) {
-    const rect = el.getBoundingClientRect();
-    const inbox = el.querySelector('a[href="/direct/inbox/"], a[href="/direct/inbox"]');
-    if (inbox && rect.height >= 48 && rect.height <= 140) {
+  for (let depth = 0; depth < 5 && el && el !== document.body; depth += 1) {
+    if (el.childElementCount > 24) break;
+    if (el.querySelector('a[href="/direct/inbox/"], a[href="/direct/inbox"]')) {
       el.setAttribute("data-dmgram-chrome", "nav");
+      chromeMarked = true;
       return;
     }
     el = el.parentElement;
   }
 }
 
-function scanNode(node) {
-  if (!node || node.nodeType !== 1 || node.hasAttribute("data-dmgram-checked")) return;
-  const list = [node];
-  if (node.querySelectorAll) {
-    for (const el of node.querySelectorAll("span, a, button, h1, h2, h3, svg, [role='button']")) list.push(el);
+function caught() {
+  return document.documentElement.hasAttribute("data-dmgram-caught");
+}
+
+function hideFreshArticle(article) {
+  if (!article || article.hasAttribute("data-dmgram-hidden")) return;
+  hide(article);
+}
+
+function isLabel(el) {
+  const tag = el.tagName;
+  return tag === "SPAN" || tag === "A" || tag === "BUTTON" || tag === "H1" || tag === "H2" || tag === "H3" || tag === "SVG" || el.getAttribute("role") === "button";
+}
+
+function classifyIfLabel(el) {
+  if (!isLabel(el)) return;
+  if (el.childElementCount > 0 && !(el.getAttribute("aria-label") || "").trim()) return;
+  classify(el);
+}
+
+function insideHidden(node) {
+  let el = node;
+  for (let depth = 0; depth < 14 && el && el !== document.body; depth += 1) {
+    if (el.hasAttribute && el.hasAttribute("data-dmgram-hidden")) return true;
+    el = el.parentElement;
   }
-  if (document.documentElement.hasAttribute("data-dmgram-caught")) {
-    if (node.tagName === "ARTICLE") hide(node);
-    if (node.querySelectorAll) {
-      for (const article of node.querySelectorAll("article")) hide(article);
-    }
-  }
-  for (const el of list) {
-    if (el.hasAttribute("data-dmgram-checked")) continue;
-    el.setAttribute("data-dmgram-checked", "");
-    classify(el);
+  return false;
+}
+
+function scanArticle(article) {
+  if (!article || article.hasAttribute("data-dmgram-checked") || insideHidden(article)) return;
+  article.setAttribute("data-dmgram-checked", "");
+  const stack = [article];
+  let seen = 0;
+  while (stack.length && seen < 80) {
+    const el = stack.pop();
+    if (!el || el.nodeType !== 1 || (el !== article && el.tagName === "ARTICLE")) continue;
+    seen += 1;
+    if (el !== article) classifyIfLabel(el);
+    const kids = el.children;
+    const limit = Math.min(kids.length, 8);
+    for (let i = limit - 1; i >= 0; i -= 1) stack.push(kids[i]);
   }
 }
 
+const lateNodes = new WeakSet();
+const kidCursor = new WeakMap();
 let pending = [];
+let pendingAt = 0;
 let scheduled = false;
 let samples = 0;
 let sampleSum = 0;
+let maxMs = 0;
+
+function enqueue(node, late) {
+  if (!node || node.nodeType !== 1) return;
+  if (late) lateNodes.add(node);
+  pending.push(node);
+}
+
+function takePending() {
+  if (pendingAt >= pending.length) return null;
+  const node = pending[pendingAt];
+  pending[pendingAt] = null;
+  pendingAt += 1;
+  return node;
+}
+
+function scanNode(node) {
+  if (!node || node.nodeType !== 1 || node.hasAttribute("data-dmgram-hidden")) return;
+  const late = lateNodes.has(node);
+  if (node === document.body || node === document.documentElement) {
+    for (const child of node.children) enqueue(child, late);
+    return;
+  }
+  if (node.tagName === "ARTICLE") {
+    if (late) hideFreshArticle(node);
+    else scanArticle(node);
+    return;
+  }
+  const resume = kidCursor.get(node) || 0;
+  if (!resume && !late) classifyIfLabel(node);
+  const kids = node.children;
+  const end = Math.min(kids.length, resume + 12);
+  for (let i = resume; i < end; i += 1) enqueue(kids[i], late);
+  if (end < kids.length) {
+    kidCursor.set(node, end);
+    enqueue(node, late);
+  } else if (resume) kidCursor.delete(node);
+}
 
 function flush() {
   scheduled = false;
-  const batch = pending;
-  pending = [];
   const started = performance.now();
-  for (const node of batch) scanNode(node);
-  markChrome();
-  placeFileInput();
+  let processed = 0;
+  while (pendingAt < pending.length && processed < 5 && performance.now() - started < 1) {
+    scanNode(takePending());
+    processed += 1;
+  }
+  if (pendingAt >= pending.length) {
+    pending = [];
+    pendingAt = 0;
+  }
+  if (pending.length) {
+    scheduled = true;
+    requestAnimationFrame(flush);
+  }
   const elapsed = performance.now() - started;
   sampleSum += elapsed;
   samples += 1;
-  if (CONFIG.debug && window.__dmgramLog && (elapsed > 2 || samples % 40 === 0)) {
-    window.__dmgramLog("info", "cleanup avgMs=" + (sampleSum / samples).toFixed(2) + " lastMs=" + elapsed.toFixed(2));
+  if (elapsed > maxMs) maxMs = elapsed;
+  const tab = (window.__dmgram && window.__dmgram.tab) || "?";
+  if (CONFIG.debug && window.__dmgramLog && (samples <= 2 || elapsed >= maxMs || samples % 20 === 0)) {
+    window.__dmgramLog("info", "cleanup tab=" + tab + " avgMs=" + (sampleSum / samples).toFixed(2) + " lastMs=" + elapsed.toFixed(2) + " maxMs=" + maxMs.toFixed(2));
   }
 }
 
 function queue(node) {
-  pending.push(node);
-  if (scheduled) return;
+  enqueue(node);
+  if (scheduled || !pending.length) return;
   scheduled = true;
   requestAnimationFrame(flush);
 }
@@ -214,9 +260,16 @@ function applyRemoteRules() {
     (document.head || document.documentElement).appendChild(style);
   }
   style.textContent = parts.join("\n");
+  markerList("similar");
+  markerList("nags");
+  markerList("caughtUp");
+  markerList("sponsored");
+  markerList("suggested");
+  markerList("follow");
 }
 
 function placeFileInput() {
+  if (!location.pathname.includes("/direct/")) return;
   const input = document.querySelector("input[type='file']");
   const svg = document.querySelector('svg[aria-label="Add Photo or Video"]');
   if (!input || !svg) return;
@@ -240,12 +293,24 @@ function placeFileInput() {
 window.__dmgramApplyRules = applyRemoteRules;
 applyRemoteRules();
 
+function scheduleChrome() {
+  if (chromeMarked) return;
+  setTimeout(() => {
+    markChrome();
+    if (!chromeMarked) scheduleChrome();
+  }, 400);
+}
+
 const cleanupObserver = new MutationObserver((records) => {
   const started = performance.now();
+  const late = caught();
   for (const record of records) {
-    for (const node of record.addedNodes) {
-      if (node.nodeType === 1) pending.push(node);
+    const added = record.addedNodes;
+    if (added.length > 8 && record.target && record.target.nodeType === 1) {
+      enqueue(record.target, late);
+      continue;
     }
+    for (const node of added) enqueue(node, late);
   }
   const elapsed = performance.now() - started;
   if (CONFIG.debug && window.__dmgramLog && elapsed > 2) {
@@ -261,5 +326,6 @@ if (document.documentElement) {
   cleanupObserver.observe(document.documentElement, { childList: true, subtree: true });
   if (document.body) queue(document.body);
 }
-document.addEventListener("scroll", () => queue(document.documentElement), true);
-window.addEventListener("resize", () => queue(document.documentElement));
+scheduleChrome();
+document.addEventListener("scroll", () => placeFileInput(), true);
+window.addEventListener("resize", () => placeFileInput());

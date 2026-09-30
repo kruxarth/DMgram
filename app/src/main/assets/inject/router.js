@@ -260,7 +260,8 @@
         const rect = video.getBoundingClientRect();
         if (rect.width <= window.innerWidth * 0.8 || rect.height <= window.innerHeight * 0.7) return false;
         if (!intersectsViewport(rect)) return false;
-        return painted(video);
+        if (!painted(video)) return false;
+        return !!video.currentSrc;
       });
     }
 

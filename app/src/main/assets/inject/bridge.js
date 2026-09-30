@@ -263,6 +263,9 @@ function publishTheme() {
   // native chrome over a dark page; native follows the system (as Instagram does) until then.
   if (!root.classList.contains("__fb-dark-mode") && !root.classList.contains("__fb-light-mode")) return;
   const dark = root.classList.contains("__fb-dark-mode");
+  // Runs after every page change (each keystroke in a DM). The background only changes with the mode,
+  // so skip the style read unless the mode flipped.
+  if (lastTheme && lastTheme.charAt(0) === (dark ? "1" : "0") && !/transparent|rgba\([^)]*,\s*0\)/.test(lastTheme)) return;
   const background = getComputedStyle(document.body || root).backgroundColor || "";
   const key = (dark ? "1" : "0") + background;
   if (key === lastTheme) return;

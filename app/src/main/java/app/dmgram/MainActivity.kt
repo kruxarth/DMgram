@@ -22,7 +22,8 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -239,6 +240,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DmgramFrame(
     frame: FrameUi,
@@ -259,7 +261,11 @@ private fun DmgramFrame(
 ) {
     val view = LocalView.current
     val density = LocalDensity.current
-    val keyboard = WindowInsets.ime.getBottom(density) > 0
+    // The keyboard's final size, not its per-frame slide: reading WindowInsets.ime here recomposed the whole
+    // frame and resized the WebView (a full Instagram relayout) on every frame of the keyboard animation.
+    // Like Chrome, resize once when the keyboard starts moving.
+    val keyboardInsets = WindowInsets.imeAnimationTarget
+    val keyboard = keyboardInsets.getBottom(density) > 0
     val pageDark = frame.pageDark ?: systemDark
     SideEffect {
         onKeyboard(keyboard)
@@ -286,7 +292,7 @@ private fun DmgramFrame(
     }
     val bottom = when {
         frame.fullScreen -> WindowInsets(0, 0, 0, 0)
-        keyboard -> WindowInsets.ime.union(WindowInsets.navigationBars)
+        keyboard -> keyboardInsets.union(WindowInsets.navigationBars)
         !frame.showTabBar -> WindowInsets.navigationBars
         else -> WindowInsets(0, 0, 0, 0)
     }

@@ -334,6 +334,20 @@ function applyRemoteRules() {
   markerList("follow");
 }
 
+let placeScheduled = false;
+let placedAt = "";
+
+// Scroll events fire many times a frame (and on every keystroke that scrolls the thread): measure at most
+// once per frame, and only touch the input's style when its position actually changed.
+function schedulePlaceFileInput() {
+  if (placeScheduled || !location.pathname.includes("/direct/")) return;
+  placeScheduled = true;
+  requestAnimationFrame(() => {
+    placeScheduled = false;
+    placeFileInput();
+  });
+}
+
 function placeFileInput() {
   if (!location.pathname.includes("/direct/")) return;
   const input = document.querySelector("input[type='file']");
@@ -344,6 +358,9 @@ function placeFileInput() {
   if (bounds.width < 8 || bounds.bottom < 0 || bounds.top > window.innerHeight) return;
   const parent = input.offsetParent || document.body;
   const origin = parent.getBoundingClientRect();
+  const key = [bounds.left - origin.left, bounds.top - origin.top, bounds.width, bounds.height].map(Math.round).join(",");
+  if (key === placedAt && input.style.getPropertyValue("position") === "absolute") return;
+  placedAt = key;
   input.style.setProperty("display", "block", "important");
   input.style.setProperty("position", "absolute", "important");
   input.style.setProperty("opacity", "0", "important");
@@ -391,5 +408,5 @@ if (document.documentElement) {
   if (document.body) queue(document.body);
 }
 scheduleChrome();
-document.addEventListener("scroll", () => placeFileInput(), true);
-window.addEventListener("resize", () => placeFileInput());
+document.addEventListener("scroll", schedulePlaceFileInput, { capture: true, passive: true });
+window.addEventListener("resize", schedulePlaceFileInput);

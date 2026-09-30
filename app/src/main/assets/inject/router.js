@@ -344,10 +344,37 @@
       });
     }
 
+    // Typing in a thread changes the page on every keystroke. Detection measures videos (a forced layout),
+    // so run it only when a video comes or goes, or starts playing; while locked, on any change so a
+    // viewer that closes without removing its video still unlocks.
+    function touchesVideo(records) {
+      if (dmgram.reelLocked) return true;
+      for (const record of records) {
+        for (const list of [record.addedNodes, record.removedNodes]) {
+          for (const node of list) {
+            if (node.nodeType !== 1) continue;
+            if (node.tagName === "VIDEO" || (node.firstElementChild && node.querySelector("video"))) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function onReelMutations(records) {
+      if (touchesVideo(records)) scheduleReel();
+    }
+
+    function onMediaEvent(event) {
+      if (reelObserver && event.target && event.target.tagName === "VIDEO") scheduleReel();
+    }
+    // Media events don't bubble, but a capturing listener on the document still sees them.
+    document.addEventListener("playing", onMediaEvent, true);
+    document.addEventListener("loadedmetadata", onMediaEvent, true);
+
     function syncReelObserver() {
       const onThread = dmgram.route === "DIRECT_THREAD";
       if (onThread && !reelObserver && document.documentElement) {
-        reelObserver = new MutationObserver(scheduleReel);
+        reelObserver = new MutationObserver(onReelMutations);
         reelObserver.observe(document.documentElement, { childList: true, subtree: true });
         scheduleReel();
       } else if (!onThread && reelObserver) {

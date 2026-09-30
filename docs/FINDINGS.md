@@ -275,3 +275,33 @@ Confidence: medium.
 3. **Hashtags land on** `/explore/search/keyword/?q=%23…`, while the anchor still says `/explore/tags/…`.
 4. **Profile reposts** (`/<user>/reposts/`) need a route class.
 5. **Unread title works on the inbox only.** The feed badge is DOM.
+
+## Phase 1–2 notes (30 Sep 2026, same phone)
+
+These were checked in the debug app after the frame and the rules existed. Chrome 153 WebView, account `example_user`, CSS viewport about 375×698 inside the padded WebView (the full screen is 1080×2400).
+
+**navigate().** Click works for `/`, `/explore/`, `/notifications/` (when the heart link is in the DOM), and `/<username>/`. `pushState` + a synthetic `popstate` renders `/notifications/` when the link is missing, and renders `/explore/search/` (Recent, Clear all). Focusing `input[type=search]` from script does not leave `/explore/`. A real tap does. Header search therefore clicks `/explore/` and then pushStates to `/explore/search/`.
+
+**`/direct/inbox/` from another tab** must not be an in-page navigation. `navigate()` asks native to switch. An earlier version fell through to `pushState` and put the inbox URL on the Home WebView.
+
+**History.** `history.length` and `navigation.currentEntry.index` move with `pushState`. `WebView.canGoBack()` stays false, and `goBack()` / `goBackOrForward()` do nothing, while `history.back()` and `history.go(n)` work. Q2's note that `canGoBack()` would be true does not hold for these same-document entries. Android back uses the JS history. At index 0 it moves the task to the back.
+
+**`/explore/`.** Allowed, same as `/explore/search/`. The plan's later sentence that `pushState('/explore/')` is blocked is stale. `/explore/search/keyword/` and `/reels/` are blocked. The notice is "Not available in DMGram".
+
+**Reels.** `/friend_c/reel/REELCODE1/` from a profile grid is one video, route `REEL_SINGLE`. A reel shared in a DM opened a viewer on the thread URL: one viewport-tall video, two 0×0 videos, no "Suggested" text. Swipes did not change the account (`lolwith_vibe`). The bubble `img` had no reel `href`. The lock arms on that single viewport video. The thread header and the viewer both expose `svg[aria-label="Back"]`; the viewer close must use the one that contains the viewport video, or the thread back lands on the inbox and the Home tab switches to DMs.
+
+**Two WebViews.** Home and the inbox stay loaded together. No "open in another window" string was on the inbox. A new message arriving while both were alive was not watched.
+
+**Renderer.** `Page.crash` on one target killed the shared renderer. The process survived and both tabs were created again. Home came back at `/`.
+
+**DevTools.** Both WebViews report `visible: true` when one is `View.INVISIBLE`.
+
+**Keyboard.** Gesture and 3-button: the thread composer sits on the keyboard. Navigation mode was restored to `2`. Night mode was restored to auto. Toggling night did not reload the documents.
+
+**Background.** With DevTools `Network.enable` on both WebViews, pressing Home and waiting two minutes produced **no** HTTP requests. Two `POST /ajax/bz` calls in an earlier window were from the second before Home, not from the background. An idle websocket was not counted.
+
+**Incoming view.** `am start -a android.intent.action.VIEW -d https://www.instagram.com/p/Dd0vEquDquw/` opened the official Instagram app. The same intent with `-n app.dmgram.debug/app.dmgram.MainActivity` loaded `/p/Dd0vEquDquw/` in the Home tab (`POST`). Supported links are not verified (`autoVerify` is off), so the user has to open Instagram links with DMGram.
+
+**External link.** A Threads profile link (`https://www.threads.com/@…`) opened a Firefox Custom Tab.
+
+**Reel dismiss.** The viewer chevron is `svg[aria-label="Close"]`, not Back. `element.click()` does not dismiss it. A real tap does, and the thread stays on `/direct/t/…`. Android back sends that tap. The thread's own control remains `svg[aria-label="Back"]`.

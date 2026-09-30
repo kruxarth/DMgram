@@ -407,6 +407,8 @@ class TabController(
         )
         WebViewFactory.configure(web)
         web.setDownloadListener { url, _, _, _, _ ->
+            // Only https: a blob:/data: download would hand page content to whatever handles it.
+            if (!url.startsWith("https://", ignoreCase = true)) return@setDownloadListener
             Log.i(DMGramApp.TAG, "Download opened in a Custom Tab")
             openExternal(url)
         }

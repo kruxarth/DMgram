@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window chrome before Compose draws. Keep in sync with ui/theme/Color.kt. -->
+    <color name="window_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#F2F2F2</color>
+</resources>

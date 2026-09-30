@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DMGram</string>
+    <string name="webview_update_required">Update Android System WebView</string>
+    <string name="webview_update_action">Open Play Store</string>
+</resources>

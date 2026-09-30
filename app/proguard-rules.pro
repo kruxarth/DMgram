@@ -27,3 +27,11 @@
 
 -dontnote kotlinx.serialization.**
 -dontwarn kotlinx.serialization.internal.**
+
+# Release builds keep only Log.e. The others print URLs, routes and the username.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+    public static int w(...);
+}

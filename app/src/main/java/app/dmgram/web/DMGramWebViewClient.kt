@@ -7,6 +7,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import app.dmgram.BuildConfig
 import app.dmgram.DMGramApp
 
 class DMGramWebViewClient(
@@ -46,7 +47,7 @@ class DMGramWebViewClient(
         if (!request.isForMainFrame) return
         Log.e(
             DMGramApp.TAG,
-            "Main frame error ${error.errorCode} ${error.description} ${request.url}",
+            "Main frame error ${error.errorCode} ${error.description} ${if (BuildConfig.DEBUG) request.url else ""}",
         )
         val offline = error.errorCode == ERROR_HOST_LOOKUP ||
             error.errorCode == ERROR_CONNECT ||
@@ -61,7 +62,7 @@ class DMGramWebViewClient(
         errorResponse: WebResourceResponse,
     ) {
         if (!request.isForMainFrame || errorResponse.statusCode < 400) return
-        Log.e(DMGramApp.TAG, "Main frame HTTP ${errorResponse.statusCode} ${request.url}")
+        Log.e(DMGramApp.TAG, "Main frame HTTP ${errorResponse.statusCode} ${if (BuildConfig.DEBUG) request.url else ""}")
         onMainFrameError(false)
     }
 }

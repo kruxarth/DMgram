@@ -785,7 +785,7 @@ class TabController(
         try {
             CustomTabsIntent.Builder().build().launchUrl(activity, Uri.parse(url))
         } catch (error: ActivityNotFoundException) {
-            Log.e(DMGramApp.TAG, "No Custom Tab for $url", error)
+            Log.e(DMGramApp.TAG, "No Custom Tab${if (BuildConfig.DEBUG) " for $url" else ""}", error)
             openSystem(url)
         }
     }
@@ -794,7 +794,7 @@ class TabController(
         try {
             activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (error: ActivityNotFoundException) {
-            Log.e(DMGramApp.TAG, "No handler for $url", error)
+            Log.e(DMGramApp.TAG, "No handler${if (BuildConfig.DEBUG) " for $url" else ""}", error)
         }
     }
 

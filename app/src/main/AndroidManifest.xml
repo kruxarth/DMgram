@@ -20,6 +20,7 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
             android:exported="true"
             android:launchMode="singleTask"
+            android:taskAffinity=""
             android:screenOrientation="portrait"
             android:theme="@style/Theme.DMGram.Splash"
             android:windowSoftInputMode="adjustResize">

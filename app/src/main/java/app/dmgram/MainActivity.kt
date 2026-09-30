@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewFeature
 import app.dmgram.tabs.FrameUi
@@ -59,6 +60,7 @@ class MainActivity : ComponentActivity() {
     private var splashStarted = 0L
     private var webContainer: FrameLayout? = null
     private var controller: TabController? = null
+    private var media: app.dmgram.web.MediaRequests? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -82,9 +84,12 @@ class MainActivity : ComponentActivity() {
         }
         val container = FrameLayout(this)
         webContainer = container
+        val requests = app.dmgram.web.MediaRequests(this)
+        media = requests
         val tabs = TabController(
             activity = this,
             container = container,
+            media = requests,
             onHomeReady = { homeReady = true },
             onChanged = { frame = controller?.snapshot() ?: FrameUi() },
         )
@@ -143,6 +148,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        media?.cancel()
+        media = null
         controller?.destroyAll()
         controller = null
         webContainer = null
@@ -230,9 +237,14 @@ private fun DmgramFrame(
     SideEffect {
         onKeyboard(keyboard)
         val window = (view.context as? ComponentActivity)?.window ?: return@SideEffect
-        WindowInsetsControllerCompat(window, view).apply {
-            isAppearanceLightStatusBars = !pageDark
-            isAppearanceLightNavigationBars = !pageDark
+        val insets = WindowInsetsControllerCompat(window, view)
+        insets.isAppearanceLightStatusBars = !pageDark
+        insets.isAppearanceLightNavigationBars = !pageDark
+        if (frame.fullScreen) {
+            insets.hide(WindowInsetsCompat.Type.systemBars())
+            insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            insets.show(WindowInsetsCompat.Type.systemBars())
         }
         window.decorView.setBackgroundColor(windowBackground(pageDark))
     }

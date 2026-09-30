@@ -1,11 +1,15 @@
 package app.dmgram.web
 
+import android.net.Uri
 import android.view.View
+import android.webkit.PermissionRequest
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.widget.FrameLayout
 
 class DMGramChromeClient(
     private val host: FrameLayout,
+    private val files: MediaRequests,
     private val onFullscreenChanged: (Boolean) -> Unit,
     private val onProgress: (Int) -> Unit,
     private val onTitle: (String?) -> Unit,
@@ -30,6 +34,7 @@ class DMGramChromeClient(
         showCustom(view, callback)
     }
 
+    @Deprecated("Kept so older WebView builds still enter fullscreen")
     override fun onShowCustomView(view: View?, requestedOrientation: Int, callback: CustomViewCallback?) {
         showCustom(view, callback)
     }
@@ -53,6 +58,16 @@ class DMGramChromeClient(
 
     override fun onHideCustomView() {
         exitFullscreen()
+    }
+
+    override fun onShowFileChooser(
+        webView: android.webkit.WebView?,
+        filePathCallback: ValueCallback<Array<Uri>>?,
+        fileChooserParams: FileChooserParams?,
+    ): Boolean = files.showFileChooser(fileChooserParams, filePathCallback)
+
+    override fun onPermissionRequest(request: PermissionRequest) {
+        files.onPermissionRequest(request)
     }
 
     override fun onProgressChanged(view: android.webkit.WebView?, newProgress: Int) {

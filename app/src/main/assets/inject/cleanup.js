@@ -182,6 +182,7 @@ function flush() {
   const started = performance.now();
   for (const node of batch) scanNode(node);
   markChrome();
+  placeFileInput();
   const elapsed = performance.now() - started;
   sampleSum += elapsed;
   samples += 1;
@@ -215,6 +216,27 @@ function applyRemoteRules() {
   style.textContent = parts.join("\n");
 }
 
+function placeFileInput() {
+  const input = document.querySelector("input[type='file']");
+  const svg = document.querySelector('svg[aria-label="Add Photo or Video"]');
+  if (!input || !svg) return;
+  const button = svg.parentElement || svg;
+  const bounds = button.getBoundingClientRect();
+  if (bounds.width < 8 || bounds.bottom < 0 || bounds.top > window.innerHeight) return;
+  const parent = input.offsetParent || document.body;
+  const origin = parent.getBoundingClientRect();
+  input.style.setProperty("display", "block", "important");
+  input.style.setProperty("position", "absolute", "important");
+  input.style.setProperty("opacity", "0", "important");
+  input.style.setProperty("z-index", "2147483647", "important");
+  input.style.setProperty("margin", "0", "important");
+  input.style.setProperty("padding", "0", "important");
+  input.style.setProperty("left", (bounds.left - origin.left) + "px", "important");
+  input.style.setProperty("top", (bounds.top - origin.top) + "px", "important");
+  input.style.setProperty("width", Math.max(bounds.width, 32) + "px", "important");
+  input.style.setProperty("height", Math.max(bounds.height, 32) + "px", "important");
+}
+
 window.__dmgramApplyRules = applyRemoteRules;
 applyRemoteRules();
 
@@ -239,3 +261,5 @@ if (document.documentElement) {
   cleanupObserver.observe(document.documentElement, { childList: true, subtree: true });
   if (document.body) queue(document.body);
 }
+document.addEventListener("scroll", () => queue(document.documentElement), true);
+window.addEventListener("resize", () => queue(document.documentElement));

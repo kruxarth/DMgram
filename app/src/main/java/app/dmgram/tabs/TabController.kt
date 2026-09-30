@@ -41,6 +41,7 @@ import java.net.URISyntaxException
 class TabController(
     private val activity: ComponentActivity,
     private val container: FrameLayout,
+    private val media: app.dmgram.web.MediaRequests,
     private val onHomeReady: () -> Unit,
     private val onChanged: () -> Unit,
 ) {
@@ -315,8 +316,13 @@ class TabController(
             FrameLayout.LayoutParams.MATCH_PARENT,
         )
         WebViewFactory.configure(web)
+        web.setDownloadListener { url, _, _, _, _ ->
+            Log.i(DMGramApp.TAG, "Download opened in a Custom Tab")
+            openExternal(url)
+        }
         val chrome = DMGramChromeClient(
             host = container,
+            files = media,
             onFullscreenChanged = { fullscreen ->
                 slot.fullscreenVideo = fullscreen
                 publish()

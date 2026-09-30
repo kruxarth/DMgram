@@ -325,3 +325,19 @@ These were checked in the debug app after the frame and the rules existed. Chrom
 **Theme.** `cmd uimode night yes` set `__fb-dark-mode`, `color-scheme: dark`, background `rgb(12, 16, 20)`, with `matchMedia('(prefers-color-scheme: dark)')` true. Documents were not reloaded. Instagram's own appearance switch was not touched, so a disagreement with the system was not created. `night no` restored `__fb-light-mode` and white. The phone was left on light.
 
 **Cleanup cost.** Debug log: observer callbacks did not exceed 2ms. The animation-frame scan averaged 2.2ms and one batch was 7.1ms.
+
+## Phase 4 (30 Sep 2026)
+
+**Photos.** Instagram's file input is `display: none` and `accept=".png,.jpg,.jpeg"` with `multiple`. A script `click()` does not call `onShowFileChooser`. A real tap on the input does. `cleanup.js` lays that input over `svg[aria-label="Add Photo or Video"]` (absolute, opacity 0, not reparented). Extensions are treated as images, so the Android Photo Picker opens (`PickMultipleVisualMedia`). `GetContent` with `typ=.png` had thrown `ActivityNotFoundException`. Cancel (back) returned to the thread, and the next tap opened the picker again. The callback is completed exactly once.
+
+One solid red test image was sent in `/direct/t/1000000000000001/` at 1:53 PM. Three solid test images (blue, green, red), and only those, were sent in the same thread as one message. Personal photos in the library were not selected.
+
+**Voice.** Q15's Voice Clip control opened the system dialog "Allow DMGram to record audio?". "While using the app" granted `RECORD_AUDIO`. A dark recorder then covered the thread, and the reel lock armed because that UI contains a viewport-sized video. Back closed it. No voice message was sent. Other permission resources are still denied in code.
+
+**Your story.** The plus badge on Home opened the photo picker. Nothing was posted.
+
+**Hidden tab.** A Home video was playing muted. After the DMs tab was selected it was `paused`.
+
+**Fullscreen and downloads.** No HTML5 fullscreen control exists (Q17). `onShowCustomView` / `onHideCustomView` are implemented and were not entered. A download was not triggered; the listener opens the URL in a Custom Tab.
+
+**Trial text.** At the user's request, the message `trial` was sent to a friend (`friend_d`, `/direct/t/1000000000000002/`) at 2:02 PM. No text was sent to the test thread.

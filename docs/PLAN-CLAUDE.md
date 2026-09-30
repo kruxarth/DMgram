@@ -34,7 +34,7 @@ Output: `docs/REVIEW-1.md`, numbered tasks for Grok. Fix only one-liners yoursel
 ## Step 1: Final review (after Grok tags `phase-6`)
 
 1. Device walkthrough, using the acceptance lists from every phase in PLAN-GROK as the checklist: cold start, tab switching, back, reselect, keyboard, reels, blocked links, search, profile, login/logout, update banner, rules override, renderer crash.
-2. Security pass (targeted files only):
+2. Security pass (targeted files only). **Already done in Reviews 1–2** (see `docs/REVIEW-1.md`, `docs/REVIEW-2.md`): incoming intents, route hosts, rules sanitizer/injection, bridge, mic permission. Only re-check what changed since `phase-5` (`git diff phase-5..HEAD --stat`) plus the release items below:
    - `RulesSanitizer` and the rules pipeline: no path lets remote data become JS
    - `Bridge` and `NavPolicy` URL handling
    - Manifest: exported components, permissions, intent filters

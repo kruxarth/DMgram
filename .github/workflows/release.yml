@@ -30,10 +30,24 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          # The alias isn't secret: take it from the Secrets tab, else the Variables tab, else the alias the
+          # keystore was created with. keytool's PKCS12 keystores use one password for the store and the key.
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || vars.KEY_ALIAS || 'dmgram' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || secrets.KEYSTORE_PASSWORD }}
         run: |
+          missing=""
+          [ -n "$KEYSTORE_BASE64" ] || missing="$missing KEYSTORE_BASE64"
+          [ -n "$KEYSTORE_PASSWORD" ] || missing="$missing KEYSTORE_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing (Settings > Secrets and variables > Actions > Secrets tab)"
+            exit 1
+          fi
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dmgram-release.jks"
+          # Fail here with a readable message, before a 3-minute build, if the key can't be opened.
+          if ! keytool -list -keystore "$RUNNER_TEMP/dmgram-release.jks" -storepass:env KEYSTORE_PASSWORD -alias "$KEY_ALIAS" > /dev/null; then
+            echo "::error::The keystore did not open with KEYSTORE_PASSWORD and alias '$KEY_ALIAS'"
+            exit 1
+          fi
           cat > keystore.properties <<EOF
           storeFile=$RUNNER_TEMP/dmgram-release.jks
           storePassword=$KEYSTORE_PASSWORD

@@ -2,6 +2,21 @@
 
 Read `docs/PRODUCT.md` first. It is the spec; this file is the how.
 
+## Changes after Phase 0 (read this first)
+
+These come from `FINDINGS.md`. The sections below are already updated; this list says what moved.
+
+1. **Home is `/`, not `/?variant=following`.** The following feed has no stories bar, and the user wants stories on top. So Home is Instagram's normal home, with ads and suggestions filtered and the feed cut off at "You're all caught up". Filtering is now core Phase 3 work, not a safety net. There is no REWRITE rule anymore.
+2. **Native chrome navigates by clicking Instagram's own hidden links** (`__dmgram.navigate(path)`, §1.8). Header search and activity, tab reselect and inbox switching become in-page navigations instead of full page loads. Instagram's bottom nav and header are hidden with CSS but **must stay in the DOM**.
+3. **Logged-in state comes from the `ds_user_id` cookie**, not the route. When logged out, `/` is a marketing page (§1.7).
+4. **DM threads open in the current tab**, like the app. Only `/direct/inbox/` switches to the DMs tab (§2.2).
+5. **Search:** `/explore/` (grid hidden) and `/explore/search/` are allowed. Every other `/explore/*` path is blocked, including `/explore/search/keyword/`, where hashtag taps actually land (§2.1).
+6. **The reel lock is a DOM lock on the DM "Suggested" viewer**, which never changes the URL. `/<user>/reel/<code>/` is already a single post page and needs no lock. `/reels/*` is always blocked (§2.5).
+7. **Unread count:** the primary source is the digits `span` inside the hidden `a[href="/direct/inbox/"]` in the HOME WebView (language-independent). The inbox title is the fallback (§3.4).
+8. The PROFILE route class gains `reposts`. ACTIVITY is `/notifications/`.
+9. Once the file chooser exists, re-test "Your story" → story posting (Phase 4 acceptance).
+10. **Stop points changed.** Run Phases 1 and 2 back to back, then **stop after `phase-2`** for Claude's review. Then run Phases 3–5 back to back and **stop after `phase-5`**. Phase 6 needs the user (keystore, repo).
+
 ## Your role and boundaries
 
 - You build **all functionality**: the Android app frame, WebView setup, navigation rules, content filtering, media handling, rules/update system, release pipeline, dev tooling.
@@ -9,7 +24,8 @@ Read `docs/PRODUCT.md` first. It is the spec; this file is the how.
   - **Do not polish visuals.** Native UI you build uses plain Material 3 defaults and placeholder icons, and reads every color, size, shape and font from `ui/theme/` tokens. Functional over pretty.
   - **Do not write to** `assets/inject/polish.css` or `assets/inject/polish.js`. Create them as empty placeholders.
   - Keep the names in **"Hooks for the UX layer"** exactly as specified.
-- Work **one phase at a time**. After each phase: run its acceptance checks, commit, `git tag phase-N`, update `docs/HANDOFF.md`, then **stop and report** to the user.
+- Work **one phase at a time**. After each phase: run its acceptance checks, commit, `git tag phase-N`, update `docs/HANDOFF.md`. **Stop and report** only at the stop points in "Changes after Phase 0", or when you're blocked.
+- You can run most device checks yourself: `adb shell input …`, `adb exec-out screencap -p`, and `tools/cdp.mjs`. Ask the user only for things that need a human (logging in, sending a message from another device).
 - If this plan turns out wrong against the real site, don't hack around it silently. Record it in `FINDINGS.md`/`HANDOFF.md` and pick the simplest option that satisfies `PRODUCT.md`.
 - **Never add:** notifications, background services, WorkManager, analytics, Kotlin-side requests to instagram.com, permissions not listed here, or new DMGram screens.
 
@@ -164,7 +180,7 @@ Don't hard-code a version, and don't invent anything else.
 ### 1.2 Tabs and WebView ownership
 
 - `enum class Tab { HOME, DMS, PROFILE }` with roots:
-  - HOME: `https://www.instagram.com/?variant=following`
+  - HOME: `https://www.instagram.com/`
   - DMS: `https://www.instagram.com/direct/inbox/`
   - PROFILE: `https://www.instagram.com/<username>/` (username from Q4). Until it's known, show the loading state.
 - `TabController` is a plain class owned by the Activity. Not a ViewModel, because WebViews hold the Activity context. It holds the current tab, one WebView per tab (created lazily), and per-tab state: url, route class, canGoBack, progress, `ready`, `atTop`.
@@ -194,7 +210,7 @@ In order:
 
 ### 1.4 Tab reselect (tapping the active tab)
 
-- Not at the tab root: in `copyBackForwardList()`, find the nearest earlier entry whose URL is the tab root and `goBackOrForward(-steps)`. If there is none, `loadUrl(root)`.
+- Not at the tab root: in `copyBackForwardList()`, find the nearest earlier entry whose URL is the tab root and `goBackOrForward(-steps)`. If there is none, `__dmgram.navigate(rootPath)`.
 - At the root and not at top: `__dmgram.scrollToTop()` (smooth).
 - At the root and at top: reload (like the Instagram app refreshing the feed).
 
@@ -212,10 +228,11 @@ Native (`SwipeRefreshLayout` or Compose `PullToRefreshBox`) around each WebView.
 
 ### 1.7 Login gating
 
-- On auth routes (Q20): hide the tab bar and Home header, and show Instagram's page full-screen in the HOME WebView.
+- **Logged in = the `ds_user_id` cookie is present** (`CookieManager.getCookie("https://www.instagram.com")`, checked on every `route` event and on resume). Don't infer it from the route: when logged out, `/` itself is a marketing page with "Open app" / "Log in" buttons.
+- Logged out: hide the tab bar and Home header, and show Instagram's pages full-screen in the HOME WebView. Hide the "Open app" / "Open Instagram" nags on those pages too (Phase 3).
 - Don't create DMS or PROFILE until the user is logged in.
-- When the route leaves the auth set after login: load the HOME root, detect the username, preload DMS.
-- On logout (any tab reaches the login route after being logged in): destroy DMS and PROFILE, clear the username, switch to HOME.
+- On the transition to logged in (post-login URL may be `/?deoia=1`): stay on the HOME root, detect the username, preload DMS.
+- On the transition to logged out: destroy DMS and PROFILE, clear the username, switch to HOME.
 
 ### 1.8 Bridge (`Bridge.kt` + `bridge.js`)
 
@@ -234,7 +251,16 @@ Native (`SwipeRefreshLayout` or Compose `PullToRefreshBox`) around each WebView.
   | `ready` | `{}` | first meaningful paint of the current route (feed has a post or empty state, inbox list rendered, …) |
   | `log` | `{level, msg}` | debug builds only |
 
-- Native → JS: `evaluateJavascript("window.__dmgram && window.__dmgram.<fn>(…)")` for `scrollToTop()`, `pauseMedia()`, `setConfig(json)`.
+- Native → JS: `evaluateJavascript("window.__dmgram && window.__dmgram.<fn>(…)")` for `scrollToTop()`, `pauseMedia()`, `setConfig(json)`, `navigate(path)`.
+- **`navigate(path)`** moves Instagram to another route without a full page load. Try in order, stopping at the first that works (confirm the URL changed via the `route` event):
+  1. `.click()` an existing `a[href="<path>"]` in the DOM. Instagram's hidden nav and header links count, because `display:none` elements still dispatch clicks to React.
+  2. `history.pushState({}, '', path)` + `dispatchEvent(new PopStateEvent('popstate'))`. Only use this if testing shows Instagram's router renders the new route. Otherwise drop this step.
+  3. `location.assign(path)` (full load, last resort).
+
+  Record in `HANDOFF.md` which step works for `/`, `/explore/`, `/notifications/`, `/direct/inbox/` and `/<username>/`.
+- **Plain `TabBar` and `HomeHeader`** (see Hooks) are built in this phase:
+  - Header search → `navigate('/explore/')`, then focus `input[type="search"]` so Instagram moves to `/explore/search/`.
+  - Header activity → `navigate('/notifications/')`.
 - **All incoming messages are untrusted.** Parse with kotlinx.serialization, ignore unknown types, cap string lengths, and send every URL through `NavPolicy` before acting on it.
 
 ### 1.9 Inject bundle (`InjectBundle.kt`)
@@ -256,7 +282,9 @@ Native (`SwipeRefreshLayout` or Compose `PullToRefreshBox`) around each WebView.
 
 ### Phase 1 acceptance
 
-- Cold start → following feed. Tap DMs → the inbox is already there (no loading). Back to Home → same scroll position.
+- Cold start → Home (`/`) with the stories bar. Tap DMs → the inbox is already there (no loading). Back to Home → same scroll position.
+- With HOME and DMS both alive, ask the user to send the account a message from another device: it appears live in the DMs tab, and Instagram shows no "open in another window" warning (Q22).
+- Header search and activity open without a full page load. Record which `navigate()` step worked.
 - A video playing in Home stops when switching to DMs.
 - Back and reselect behave exactly per 1.3 and 1.4.
 - Keyboard and insets per 1.6.
@@ -275,33 +303,33 @@ Initial table (adjust using FINDINGS):
 
 | Class | Paths |
 |---|---|
-| `HOME_FEED` | `/` (any query) |
-| `DIRECT_INBOX` | `/direct/inbox/`, `/direct/requests/`, other `/direct/*` lists |
+| `HOME_FEED` | `/` (any query: `?variant=following`, `?deoia=1`, …) |
+| `DIRECT_INBOX` | `/direct/inbox/`, `/direct/requests/`, `/direct/new/` |
 | `DIRECT_THREAD` | `/direct/t/<id>/` |
 | `STORY` | `/stories/<user>/…`, `/stories/highlights/<id>/` |
 | `POST` | `/p/<code>/`, `/<user>/p/<code>/` |
-| `REEL_SINGLE` | `/reel/<code>/`, `/<user>/reel/<code>/` |
-| `REELS_FEED` | `/reels/`, `/reels/<code>/` *(if FINDINGS shows single reels open as `/reels/<code>/`, classify that as `REEL_SINGLE`)* |
-| `SEARCH` | per Q8 |
-| `EXPLORE` | `/explore/` and anything under it that isn't search, tags or locations |
-| `HASHTAG` / `LOCATION` | `/explore/tags/*`, `/explore/locations/*` |
-| `ACTIVITY` | per Q9 |
-| `PROFILE` | `/<username>/` and `/<username>/(reels|tagged|followers|following|saved)/` |
-| `ACCOUNT` | `/accounts/*` (non-auth), `accountscenter.instagram.com` |
+| `REEL_SINGLE` | `/reel/<code>/`, `/<user>/reel/<code>/` (a single post page; needs no lock) |
+| `REELS_FEED` | `/reels/`, `/reels/<code>/` (the algorithmic feed; Q7) |
+| `SEARCH` | exactly `/explore/` (grid hidden by CSS) and exactly `/explore/search/` |
+| `EXPLORE_BLOCKED` | every other `/explore/*`: `/explore/tags/*`, `/explore/locations/*`, `/explore/search/keyword/*` (where hashtag taps land; Q11), and anything unknown |
+| `ACTIVITY` | `/notifications/` |
+| `PROFILE` | `/<username>/` and `/<username>/(reels|reposts|tagged|followers|following|saved)/` |
+| `ACCOUNT` | `/accounts/*` (non-auth, e.g. `settings`, `edit`, `switch_appearance`), `accountscenter.instagram.com` |
 | `AUTH` | per Q20 |
 | `EXTERNAL` | any other host; unwrap `l.instagram.com/?u=` first |
 | `UNKNOWN` | any other instagram.com path → allow; log in debug |
 
-Usernames: `[A-Za-z0-9._]{1,30}`. Exclude reserved first segments (`p`, `reel`, `reels`, `explore`, `stories`, `direct`, `accounts`, `about`, `legal`, `developer`, `challenge`, …).
+Usernames: `[A-Za-z0-9._]{1,30}`. Exclude reserved first segments (`p`, `reel`, `reels`, `explore`, `stories`, `direct`, `accounts`, `notifications`, `about`, `legal`, `developer`, `challenge`, …). Note that `create` is **not** reserved; `/create/` is a real account (Q12).
 
 ### 2.2 Policy (`NavPolicy.kt`): (currentTab, url) → action
 
 | Condition | Action |
 |---|---|
-| `EXPLORE`, `HASHTAG`, `LOCATION`, `REELS_FEED` | `BLOCK(reason)` |
-| `HOME_FEED` in HOME without `variant=following` | `REWRITE` → native `loadUrl(HOME root)` (rare path; a full load is fine) |
-| `HOME_FEED` in DMS/PROFILE | `SWITCH(HOME)` and go to its root |
-| `DIRECT_*` in HOME/PROFILE | `SWITCH(DMS)` and load that URL in the DMS WebView; the original tab stays where it was |
+| `EXPLORE_BLOCKED`, `REELS_FEED` | `BLOCK(reason)` |
+| `HOME_FEED` in HOME | `ALLOW` (any query) |
+| `HOME_FEED` in DMS/PROFILE | `SWITCH(HOME)`, showing Home as it was (no reload) |
+| `DIRECT_INBOX` in HOME/PROFILE | `SWITCH(DMS)`, showing the inbox as it was (no reload); the original tab stays where it was |
+| `DIRECT_THREAD` in any tab | `ALLOW` in the current tab (like the app: back returns to where you were) |
 | `EXTERNAL` | open a Custom Tab (link shim unwrapped) |
 | `mailto:`, `tel:` | system `ACTION_VIEW` in try/catch |
 | `intent:` and Instagram app deep links | ignore silently |
@@ -311,7 +339,8 @@ Usernames: `[A-Za-z0-9._]{1,30}`. Exclude reserved first segments (`p`, `reel`, 
 
 1. **`router.js` click capture:** `click`/`auxclick` listeners in the capture phase on `document`. Take the closest `a[href]`, classify it with `CONFIG.tab`, then:
    - `BLOCK`: `preventDefault()` + `stopImmediatePropagation()`, post `blocked`
-   - `SWITCH` / `EXTERNAL` / `REWRITE`: prevent, post `navigate`
+   - `SWITCH` / `EXTERNAL`: prevent, post `navigate`
+   - Hashtag anchors carry `href="/explore/tags/…"` but Instagram navigates to `/explore/search/keyword/?q=%23…`. Layer 1 blocks the href; layer 2 catches the real URL if the click came from somewhere else.
    - `ALLOW`: do nothing
 2. **History patch:** wrap `pushState`/`replaceState`, listen to `popstate`, and post `route` on every change. If native sees a route whose action is `BLOCK` (a programmatic navigation that got past layer 1): `goBack()` if possible, else load the tab root, and show the blocked notice.
 3. **`shouldOverrideUrlLoading`** for full navigations: same policy.
@@ -330,11 +359,26 @@ Required behavior:
 - Swiping, scrolling or auto-advance **never** reaches another reel.
 - Back returns to where the user came from.
 
-Pick based on Q6/Q7:
-- **A (preferred): in-tab lock.** On `REEL_SINGLE`, `router.js` sets `data-dmgram-reel-lock` on `<html>`. `hide.css` locks the reel scroller (no scroll, siblings of the active reel hidden). While locked, any URL change to a different reel code that wasn't a user tap on a link is reverted.
-- **B (fallback): overlay viewer.** A 4th WebView created on demand over the current tab. It loads the reel URL with the lock applied and has a plain native close button. It is destroyed on close.
+What FINDINGS showed (Q6/Q7):
+- Feed and profile-grid reels open `/<user>/reel/<code>/`, which is already a single post page. No lock is needed there.
+- `/reels/*` is the algorithmic feed and is blocked by policy.
+- **The only real work is the DM viewer.** Tapping a shared reel in `/direct/t/<id>/` opens a full-screen overlay (header "Suggested", about 8 stacked viewport-tall `video`s). Swiping advances, and **the URL never changes**, so this must be a DOM lock in `router.js` (or a small `reel-lock` part of it).
 
-Document the choice and why in `HANDOFF.md`.
+Implementation:
+- **Detect the viewer structurally, not by the English "Suggested" text:**
+  - on a `DIRECT_THREAD` route
+  - a new full-viewport, fixed-position container appears with **≥ 2 `video` descendants**
+  - its scrollable ancestor (`scrollHeight > 1.5 × clientHeight`) is the reel scroller
+  - use a MutationObserver scoped to that route; no polling
+- **Lock it:**
+  - set `data-dmgram-reel-lock` on `<html>` and mark the scroller
+  - `hide.css` gives the marked scroller `overflow: hidden !important; overscroll-behavior: none` and hides every reel item except the first (the one that was sent; **verify it is the first**)
+  - also stop `touchmove`/`wheel` on the scroller in the capture phase, so scroll-snap can't advance
+  - taps (play/pause, mute, Back) must keep working
+- **Unlock** when the viewer closes: the container is removed or `svg[aria-label="Back"]` is used. Android back must close the viewer and return to the thread, not leave the thread.
+- If a structural lock turns out unreliable, fall back to **B**: a 4th WebView created on demand over the current tab, loading `/reel/<code>/` (a single post page), with a plain native close button, destroyed on close. B needs the reel's code from the DM bubble. Record in FINDINGS whether the bubble exposes it (an `href`, or a code in an attribute or image URL).
+
+Document which approach shipped, and why, in `HANDOFF.md`.
 
 ### 2.6 Chrome policy (`ChromePolicy.kt`)
 
@@ -359,11 +403,12 @@ Add an `ACTION_VIEW` intent filter (no `autoVerify`) for `https://www.instagram.
 ### Phase 2 acceptance
 
 - `./gradlew test` and `node tools/test-router.mjs` pass.
-- DM → shared reel: it plays, swiping up shows no other reel, back returns to the thread.
-- Friend's reel in the feed and a reel from a profile grid behave the same.
+- DM → shared reel: the reel that was sent plays, swiping up shows no other reel, and Android back and the viewer's Back both return to the thread.
+- A friend's reel in the feed and a reel from a profile grid open as a single post page.
 - Hashtag in a caption: nothing navigates; the blocked notice shows.
 - `node tools/cdp.mjs eval "location.href='/reels/'"` and `"history.pushState({},'','/explore/')"` both end back where they were, with the notice.
-- On a profile in the Home tab, tap "Message": DMs opens that thread, and Home still shows the profile when you go back to it.
+- On a profile in the Home tab, tap "Message": the thread opens in the Home tab, and back returns to the profile.
+- `node tools/cdp.mjs eval "history.pushState({},'','/explore/search/keyword/?q=%23test')"` is blocked. Header search still reaches `/explore/search/` with no grid visible.
 - Bio link → Custom Tab. `adb shell am start -a android.intent.action.VIEW -d "https://www.instagram.com/p/<code>/"` opens the post in DMGram (after enabling the link in app settings).
 
 ---
@@ -371,27 +416,43 @@ Add an `ACTION_VIEW` intent filter (no `autoVerify`) for `https://www.instagram.
 ## Phase 3: Content cleanup
 
 1. **`hide.css`** (functional hiding only, stable selectors from FINDINGS; comment each rule with what it hides and the Q number):
-   - Instagram's bottom nav and home top header, including the padding they leave behind
-   - app nags, banners and interstitials
+   - Instagram's bottom nav and home top header, including the padding they leave behind. **Hide with CSS only; never remove them from the DOM.** `navigate()` clicks their links, and the unread badge is read from the nav.
+   - app nags, banners and interstitials, including the fixed "Use the app" bar (Q13) and the logged-out "Open app" / "Open Instagram" buttons
    - Reels and Explore entry points
    - suggested-account carousels and "Suggested for you" in the feed, profiles, activity and search
    - the Explore grid on the search screen
    - the similar-accounts button on profiles
-2. **`cleanup.js`** for what CSS can't target (text-marked sponsored/suggested units):
-   - one `MutationObserver`; process added nodes only, batched per `requestAnimationFrame`
-   - mark checked nodes `data-dmgram-checked`; hide matches with the `data-dmgram-hidden` attribute (`[data-dmgram-hidden]{display:none!important}`)
-   - **never remove nodes** (it breaks React)
-   - text markers come from `rules.json` → `markers` (per language); match small label elements or `aria-label`, not a whole post's text
-   - budget: under 2 ms per observer callback on average; log the timing in debug
-3. **Network-level ad filtering: only if** Q1 found ads or suggestions on the following feed that the DOM approach can't catch reliably. Otherwise skip it and say so in `HANDOFF.md`.
-4. **Unread count** per Q5. Prefer `WebChromeClient.onReceivedTitle` and parse `^\((\d+)\)`. Fall back to the DOM badge in `bridge.js`. Expose it as Compose state for `TabBar`.
+2. **`cleanup.js`**: Home is `/`, which **does** contain ads and suggestions (Q1/Q19), so this is core work.
+   - **What to hide on `/`:**
+     - ads: short `span` "Ad" / "Sponsored" in a post header
+     - "Suggested for you" posts and account carousels
+     - suggested reels units
+     - **everything after the "You're all caught up" marker**, including "Suggested posts". The feed ends there.
+   - **Markers:** text markers come from `rules.json` → `markers`, per language. Ship English plus the most common languages you can fill in reliably. Match only short label elements or `aria-label`, never a whole post's text.
+   - **Test this language-independent signal:** a post from an account you don't follow has a **Follow button in its header**. If that holds (and never matches followed accounts' posts, including ones you follow that are shown with a "Follow back" state), use it as the primary ad/suggestion detector and text markers as backup. Record the result in FINDINGS.
+   - **Pagination check (must do):** after the caught-up cutoff, stay at the bottom of the feed for 60 s and count `/graphql/query` XHRs. If Instagram keeps loading page after page of posts we hide, stop it (for example hide or neutralize the pagination sentinel after the cutoff) and document how.
+   - Mechanics:
+     - one `MutationObserver`; process added nodes only, batched per `requestAnimationFrame`
+     - mark checked nodes `data-dmgram-checked`; hide matches with the `data-dmgram-hidden` attribute (`[data-dmgram-hidden]{display:none!important}`)
+     - **never remove nodes** (it breaks React)
+     - budget: under 2 ms per observer callback on average; log the timing in debug
+3. **Network-level ad filtering** (patching the XHR response of `PolarisFeedRootPaginationCachedQuery…`): only if the DOM approach proves unreliable. Otherwise skip it and say so in `HANDOFF.md`. Never hard-code the doc id.
+4. **Unread count:**
+   - Primary: the digits `span` inside the hidden `a[href="/direct/inbox/"]` in the **HOME** WebView (language-independent; Q5), watched with a MutationObserver.
+   - Fallback: in the DMS WebView, `WebChromeClient.onReceivedTitle` parsing `^\((\d+)\)` (the title only has the count on the inbox).
+   - Expose it as Compose state for `TabBar`.
 5. **Username** per Q4, stored in SharedPreferences, used for the PROFILE root.
 6. **Theme** per Q16: `bridge.js` reports `{dark, background}` on load and on change. Native uses it for status-bar icons and the WebView background.
+   - Test with the phone in system dark mode: does Instagram follow it without its own switch?
+   - What's the dark class on `<html>` (expected `__fb-dark-mode`)?
+   - What happens when Instagram's own appearance switch disagrees with the system?
+   - Record the answers in FINDINGS. Base `dark` on what Instagram actually renders, not on the system setting.
 7. **`ready`** per route type, used for the splash and `LoadingOverlay`.
 
 ### Phase 3 acceptance
 
-- Scroll 100 posts: no sponsored or suggested units, no reels recommendations, none of Instagram's nav bars, no "open app" nags in the main flows.
+- Scroll Home to the end: stories bar visible; no ads, suggested posts, suggested accounts or suggested reels; the feed ends at "You're all caught up"; no background fetch loop after the end (pagination check).
+- None of Instagram's nav bars and no "open app" / "Use the app" nags in the main flows, logged in or out.
 - Search shows only the field and results/recents.
 - The DMs badge matches Instagram's count and updates within seconds of a new message while the app is open.
 - The Profile tab opens your own profile.
@@ -410,7 +471,8 @@ Add an `ACTION_VIEW` intent filter (no `autoVerify`) for `https://www.instagram.
 
 - Send one photo, then three, in a DM.
 - Cancel the picker, and the next attempt still works.
-- Voice note, if applicable.
+- Voice note, if applicable. Q15 saw a "Voice Clip" control, so try it.
+- Tap "Your story" (the plus badge on your avatar in the stories bar). Phase 0 saw nothing happen, probably because there was no file chooser yet. Record in FINDINGS whether a picker opens and a story can be posted. Build nothing extra either way.
 - Fullscreen video enter/exit.
 - No audio ever plays from a hidden tab.
 

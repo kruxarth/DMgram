@@ -25,7 +25,9 @@ Cheap insurance before Grok builds on the foundation. Check only:
 - **Insets and IME:** the DM input sits on the keyboard with gesture and 3-button nav (screenshot).
 - **Bridge:** origin-restricted listener; messages validated; URLs always pass through `NavPolicy`.
 - **Navigation:** the four enforcement layers exist, and the fixtures cover the edge cases in PLAN-GROK §2.4.
-- **Reel lock:** works from a DM, the feed and a profile grid (device).
+- **Reel lock:** the DM "Suggested" viewer shows only the reel that was sent, swipes don't advance, and back returns to the thread (device). The DOM detection is structural, not English-text-based.
+- **`navigate()`:** header search/activity, reselect and the inbox switch are in-page navigations, not full reloads.
+- **Ready for Phase 3:** nothing in Phases 1–2 makes Home filtering harder (for example, Instagram's nav removed from the DOM instead of hidden with CSS).
 
 Output: `docs/REVIEW-1.md`, numbered tasks for Grok. Fix only one-liners yourself.
 
@@ -64,7 +66,7 @@ Output: `docs/REVIEW-1.md`, numbered tasks for Grok. Fix only one-liners yoursel
 6. **Full-screen surfaces:** story viewer and reel lock go immersive (system bars hidden), with a clear close/back affordance.
 7. **DMGram UI pieces:** update banner, About sheet, blocked notice, offline/error state. Small, native and calm.
 8. **DM thread:** input bar vs keyboard, photo picker round trip. Restyle Instagram's thread only where the web version looks clearly off compared with the app.
-9. **Create entry point** on the Profile tab (per FINDINGS Q12). Reachable, never prominent.
+9. **Home feed end:** the feed stops at "You're all caught up". Make that ending feel deliberate and calm, not like a broken page, and not like a wellbeing message.
 10. **App icon:** adaptive and monochrome (themed icons), no Instagram marks.
 11. **Tune `ChromePolicy`** and pull-to-refresh per route.
 

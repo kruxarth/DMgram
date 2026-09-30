@@ -30,9 +30,13 @@ Bottom tabs (3): **Home · DMs · Profile**
 
 | Tab | Shows | Notes |
 |---|---|---|
-| Home | `instagram.com/?variant=following` (people you follow, newest first) with the stories bar on top | Native header: DMGram name (tap → About sheet), Search icon, Activity icon |
+| Home | `instagram.com/` (Instagram's normal home: stories bar on top, feed of people you follow in Instagram's order), with ads and suggestions removed. The feed **ends at "You're all caught up"** | Native header: DMGram name (tap → About sheet), Search icon, Activity icon |
 | DMs | `/direct/inbox/` | Tab shows the unread count while the app is open |
-| Profile | Your own profile | Instagram's own settings (account, privacy, edit profile/photo) open from here. Instagram's "create" stays reachable from here, never in the tab bar |
+| Profile | Your own profile | Instagram's own settings (account, privacy, edit profile/photo) open from here |
+
+A DM thread opened from somewhere else (for example "Message" on a profile) opens **in the current tab**, like the Instagram app; back returns to where you were. Only the inbox itself lives in the DMs tab.
+
+**Posting:** Instagram's mobile web has no create button. Story posting via "Your story" may work once the photo picker exists (Phase 4). Either way it's not promoted.
 
 The tab bar hides on full-screen surfaces: DM thread, story viewer, reel viewer, login, and whenever the keyboard is open.
 
@@ -47,8 +51,8 @@ The tab bar hides on full-screen surfaces: DM thread, story viewer, reel viewer,
 
 **Out (decided)**
 - Notifications of any kind. DMGram does no work while closed.
-- Reels tab / reels feed, Explore grid, hashtag and location pages
-- Sponsored posts, suggested posts, suggested accounts
+- Reels tab / reels feed, Explore grid, hashtag, keyword and location result pages
+- Ads, suggested posts, suggested reels, suggested accounts, and everything after "You're all caught up"
 - Calls
 - A DMGram settings page
 - Any productivity / wellbeing feature
@@ -58,6 +62,8 @@ The tab bar hides on full-screen surfaces: DM thread, story viewer, reel viewer,
 ## The Reels rule
 
 **No algorithmic reels.** A reel from someone you chose to look at (a friend's post in your feed, a reel in a profile you opened, a reel sent in a DM) plays **one at a time** and never advances to a reel you didn't pick. The reels feed never opens.
+
+Note: Instagram opens a reel from a DM in its "Suggested" swipe viewer. DMGram locks that viewer to the one reel that was sent.
 
 ## Blocked links
 
@@ -69,7 +75,7 @@ Tapping something blocked (hashtag, Explore link) does not navigate. A brief, ne
 2. Home header
 3. Update banner (top of Home, only when an update exists)
 4. About sheet: version, update status, GitHub link, Report a problem
-5. Single-reel lock / viewer
+5. Reel lock (DM reel viewer shows only the reel that was sent)
 6. Blocked-link notice
 7. Loading, offline and error states
 8. Splash + app icon
@@ -96,7 +102,8 @@ Anything new needs a strong reason.
 |---|---|
 | Web view, not private API | Lowest ban risk; works without the Instagram app |
 | No notifications | WebViews can't receive web push; background polling costs battery and adds account risk; people open DMGram on purpose |
-| Following feed as Home | Only accounts you follow, newest first, reportedly no ads or suggestions |
+| Normal home (filtered) as Home, not the Following feed | Phase 0 showed the Following feed has no stories bar; stories on top matter more than newest-first order. Ads/suggestions are filtered, the feed ends at "caught up" |
+| DM threads open in the current tab | Matches the Instagram app; avoids reloading a thread in another tab |
 | Native frame + injected CSS, not native screens | Native screens built from scraped data break on every Instagram change and look like a bot |
 | 3 tabs, search in header | Search is occasional |
 | No settings page | Nothing left to configure once notifications were dropped |

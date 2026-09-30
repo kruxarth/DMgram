@@ -58,7 +58,7 @@ function navigate(path) {
   const target = path.startsWith("/") ? path : "/" + path;
   const absolute = new URL(target, location.origin).href;
   if (window.dmgramRouter && CONFIG.rules) {
-    const decision = window.dmgramRouter.policy(CONFIG.tab, absolute, CONFIG.rules);
+    const decision = window.dmgramRouter.policy(CONFIG.tab, absolute, CONFIG.rules, CONFIG.surface);
     if (decision.action === "BLOCK") {
       window.__dmgramPost({ type: "blocked", url: absolute, reason: decision.reason || "blocked" });
       window.__dmgram.lastNavigate = "block";
@@ -68,7 +68,7 @@ function navigate(path) {
       window.__dmgram.lastNavigate = "ignore";
       return "ignore";
     }
-    if (decision.action === "SWITCH" || decision.action === "EXTERNAL" || decision.action === "SYSTEM") {
+    if (decision.action === "SWITCH" || decision.action === "EXTERNAL" || decision.action === "SYSTEM" || decision.action === "FEED") {
       window.__dmgramPost({ type: "navigate", url: decision.url || absolute });
       window.__dmgram.lastNavigate = "native";
       dmgramLog("info", "navigate native " + target);
@@ -156,7 +156,25 @@ function setConfig(json) {
     window.__dmgram.tab = next.tab;
   }
   if (typeof next.debug === "boolean") CONFIG.debug = next.debug;
+  if (typeof next.strip === "number") setStrip(next.strip);
   if (window.__dmgramApplyRules) window.__dmgramApplyRules();
+}
+
+// The Following feed sits under the native stories strip: hide.css pads the page by --dmgram-strip
+// on the feed root so the first post starts right below the tray. Native keeps the value current.
+function setStrip(px) {
+  const value = Math.max(0, Math.min(400, Math.round(Number(px) || 0)));
+  CONFIG.strip = value;
+  const root = document.documentElement;
+  if (!root) return;
+  let style = document.getElementById("dmgram-strip");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "dmgram-strip";
+    root.appendChild(style);
+  }
+  const css = ":root{--dmgram-strip:" + value + "px}";
+  if (style.textContent !== css) style.textContent = css;
 }
 
 function setSystemDark(dark) {
@@ -178,6 +196,7 @@ function on(event, fn) {
 
 window.__dmgram = {
   tab: CONFIG.tab,
+  surface: CONFIG.surface || "PAGE",
   route: "UNKNOWN",
   systemDark: false,
   lastNavigate: "",
@@ -186,6 +205,7 @@ window.__dmgram = {
   pauseMedia,
   setConfig,
   setSystemDark,
+  setStrip,
   navigate,
   openSearch,
   back,
@@ -193,14 +213,47 @@ window.__dmgram = {
 };
 
 let atTop = true;
-function publishScroll() {
-  const top = (window.scrollY || 0) <= 2 && ((document.scrollingElement && document.scrollingElement.scrollTop) || 0) <= 2;
+// Some pages scroll an inner box, not the document (the DM inbox list does). Remember the
+// last vertically scrolling box, or native sees "at top" mid-list and turns every
+// upward drag into pull-to-refresh.
+let innerScroller = null;
+function publishScroll(event) {
+  const target = event && event.target;
+  if (target && target.nodeType === 1 && target !== document.scrollingElement && target.scrollHeight > target.clientHeight + 1) {
+    innerScroller = target;
+  }
+  if (innerScroller && !innerScroller.isConnected) innerScroller = null;
+  const pageTop = (window.scrollY || 0) <= 2 && ((document.scrollingElement && document.scrollingElement.scrollTop) || 0) <= 2;
+  const top = pageTop && (!innerScroller || innerScroller.scrollTop <= 2);
   if (top === atTop) return;
   atTop = top;
   window.__dmgramPost({ type: "scroll", atTop: top });
   dmgramEmit("scroll");
 }
 document.addEventListener("scroll", publishScroll, true);
+
+// FEED only: native moves the stories strip with the feed, so report the offset at most once per frame.
+// Past the cap the strip is fully off screen and nothing more needs to be sent.
+const SCROLL_CAP = 1000;
+let lastScrollY = -1;
+let scrollYScheduled = false;
+function publishScrollY() {
+  if (CONFIG.surface !== "FEED" || scrollYScheduled) return;
+  scrollYScheduled = true;
+  requestAnimationFrame(() => {
+    scrollYScheduled = false;
+    const raw = window.scrollY || (document.scrollingElement && document.scrollingElement.scrollTop) || 0;
+    const y = Math.max(0, Math.min(SCROLL_CAP, Math.round(raw)));
+    if (y === lastScrollY) return;
+    lastScrollY = y;
+    window.__dmgramPost({ type: "scrollY", y });
+  });
+}
+document.addEventListener("scroll", publishScrollY, { capture: true, passive: true });
+on("route", () => {
+  lastScrollY = -1;
+  publishScrollY();
+});
 
 let lastTheme = "";
 function publishTheme() {
@@ -246,7 +299,7 @@ function publishUsername() {
 // Downscaled to 96 px so the message stays small. One attempt per image URL.
 let avatarSrc = "";
 function publishAvatar() {
-  if (CONFIG.tab !== "HOME" || !lastUsername) return;
+  if (CONFIG.tab !== "HOME" || CONFIG.surface === "STORIES" || !lastUsername) return;
   const img = document.querySelector('a[href="/' + lastUsername + '/"] img');
   if (!img || !img.complete || !img.naturalWidth) return;
   const src = img.currentSrc || img.src;
@@ -267,7 +320,7 @@ function publishAvatar() {
 
 let lastUnread = null;
 function publishUnread() {
-  if (CONFIG.tab !== "HOME") return;
+  if (CONFIG.tab !== "HOME" || CONFIG.surface === "STORIES") return;
   const link = document.querySelector('a[href="/direct/inbox/"], a[href="/direct/inbox"]');
   if (!link) return;
   let count = 0;
@@ -327,6 +380,8 @@ function scheduleScan() {
 function watchPage() {
   const root = document.documentElement;
   if (!root) return;
+  root.setAttribute("data-dmgram-surface", CONFIG.surface || "PAGE");
+  setStrip(CONFIG.strip || 0);
   new MutationObserver(scheduleScan).observe(root, { childList: true, subtree: true });
   new MutationObserver(publishTheme).observe(root, { attributes: true, attributeFilter: ["class"] });
   scheduleScan();

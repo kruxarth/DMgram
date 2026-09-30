@@ -22,7 +22,7 @@ if (!router) {
 
 let failed = 0;
 for (const fixture of fixtures) {
-  const result = router.policy(fixture.tab, fixture.url, rules);
+  const result = router.policy(fixture.tab, fixture.url, rules, fixture.surface);
   const problems = [];
   if (result.class !== fixture.expectedClass) {
     problems.push(`class ${result.class} != ${fixture.expectedClass}`);
@@ -35,7 +35,7 @@ for (const fixture of fixtures) {
   }
   if (problems.length) {
     failed += 1;
-    console.error(`${fixture.tab} ${fixture.url}: ${problems.join(", ")}`);
+    console.error(`${fixture.tab}${fixture.surface ? "/" + fixture.surface : ""} ${fixture.url}: ${problems.join(", ")}`);
   }
 }
 

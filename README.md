@@ -25,10 +25,10 @@ Selector fixes ship in [`rules/rules.json`](rules/rules.json). The app fetches t
 
 ## What it leaves out
 
-DMGram shows Instagram's own site and hides the algorithmic surfaces:
+DMGram shows Instagram's own site and hides the algorithmic surfaces. Home is your stories on top of Instagram's Following feed: only accounts you follow, newest first, going further back as you scroll.
 
 - Reels tab, Explore grid, hashtags, keyword and location results
-- Ads, suggested posts, suggested reels, suggested accounts, and everything after "You're all caught up"
+- Ads, suggested posts, suggested reels, suggested accounts
 - Notifications, calls, and a settings page
 
 A reel you actually opened plays one at a time. Tapping a blocked link does nothing except the notice "Not available in DMGram".

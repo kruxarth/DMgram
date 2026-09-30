@@ -24,6 +24,12 @@ sealed interface BridgeEvent {
     class Avatar(val jpeg: ByteArray) : BridgeEvent
     data class Theme(val dark: Boolean, val background: String) : BridgeEvent
     data class Scroll(val atTop: Boolean) : BridgeEvent
+
+    /** Following feed scroll offset in CSS px (= dp), capped: drives the stories strip above it. */
+    data class ScrollY(val y: Int) : BridgeEvent
+
+    /** Stories strip: height in CSS px (= dp) from the page top to the bottom of the stories tray. */
+    data class Tray(val height: Int) : BridgeEvent
     data object Ready : BridgeEvent
     data class Log(val level: String, val msg: String) : BridgeEvent
     data class ReelLock(val active: Boolean) : BridgeEvent
@@ -32,6 +38,8 @@ sealed interface BridgeEvent {
 object Bridge {
     const val NAME = "DMGramNative"
     val ORIGINS: Set<String> = setOf("https://www.instagram.com")
+    const val SCROLL_CAP = 1_000
+    private const val TRAY_MAX = 400
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -89,6 +97,8 @@ object Bridge {
                 BridgeEvent.Theme(dark, text(obj, "background", 80) ?: "")
             }
             "scroll" -> obj["atTop"]?.jsonPrimitive?.booleanOrNull?.let(BridgeEvent::Scroll)
+            "scrollY" -> obj["y"]?.jsonPrimitive?.intOrNull?.coerceIn(0, SCROLL_CAP)?.let(BridgeEvent::ScrollY)
+            "tray" -> obj["height"]?.jsonPrimitive?.intOrNull?.takeIf { it in 1..TRAY_MAX }?.let(BridgeEvent::Tray)
             "ready" -> BridgeEvent.Ready
             "log" -> {
                 if (!BuildConfig.DEBUG) return null

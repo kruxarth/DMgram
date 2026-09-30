@@ -5,6 +5,7 @@ import app.dmgram.nav.NavAction
 import app.dmgram.nav.Rules
 import app.dmgram.nav.decide
 import app.dmgram.nav.decideIncoming
+import app.dmgram.tabs.Surface
 import app.dmgram.tabs.Tab
 import java.io.File
 import kotlinx.serialization.Serializable
@@ -20,7 +21,8 @@ class RouteTest {
         val fixtures = json.decodeFromString<List<Fixture>>(repoFile("tools/route-fixtures.json").readText())
         assertTrue("Need at least 50 fixtures", fixtures.size >= 50)
         for (fixture in fixtures) {
-            val decision = decide(Tab.valueOf(fixture.tab), fixture.url, rules)
+            val surface = fixture.surface?.let(Surface::valueOf) ?: Surface.PAGE
+            val decision = decide(Tab.valueOf(fixture.tab), fixture.url, rules, surface)
             assertEquals(fixture.url, fixture.expectedClass, decision.route.name)
             assertEquals(fixture.url, fixture.expectedAction, decision.action.name)
             val expectedTab = fixture.expectedTab
@@ -70,6 +72,7 @@ class RouteTest {
         val expectedClass: String,
         val expectedAction: String,
         val expectedTab: String? = null,
+        val surface: String? = null,
     )
 
     companion object {

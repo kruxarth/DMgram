@@ -93,5 +93,20 @@
   {"tab": "HOME", "url": "data:text/html,hi", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
   {"tab": "HOME", "url": "blob:https://www.instagram.com/x", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
   {"tab": "HOME", "url": "intent://x#Intent;scheme=https;end", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
-  {"tab": "HOME", "url": "instagram://user?username=x", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"}
+  {"tab": "HOME", "url": "instagram://user?username=x", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/", "expectedClass": "HOME_FEED", "expectedAction": "ALLOW"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/stories/friend_a/3456789012/", "expectedClass": "STORY", "expectedAction": "ALLOW"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/stories/highlights/17900000000000000/", "expectedClass": "STORY", "expectedAction": "ALLOW"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/friend_a/", "expectedClass": "PROFILE", "expectedAction": "FEED"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/p/ABC123/", "expectedClass": "POST", "expectedAction": "FEED"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/friend_a/reel/ABC123/", "expectedClass": "REEL_SINGLE", "expectedAction": "FEED"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/direct/t/1000000000000001/", "expectedClass": "DIRECT_THREAD", "expectedAction": "FEED"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/explore/search/", "expectedClass": "SEARCH", "expectedAction": "FEED"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/notifications/", "expectedClass": "ACTIVITY", "expectedAction": "FEED"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/direct/inbox/", "expectedClass": "DIRECT_INBOX", "expectedAction": "SWITCH", "expectedTab": "DMS"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/reels/", "expectedClass": "REELS_FEED", "expectedAction": "BLOCK"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/explore/tags/test/", "expectedClass": "EXPLORE_BLOCKED", "expectedAction": "BLOCK"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/create/story/", "expectedClass": "UNKNOWN", "expectedAction": "ALLOW"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://example.com/page", "expectedClass": "EXTERNAL", "expectedAction": "EXTERNAL"},
+  {"tab": "HOME", "surface": "FEED", "url": "https://www.instagram.com/friend_a/", "expectedClass": "PROFILE", "expectedAction": "ALLOW"}
 ]

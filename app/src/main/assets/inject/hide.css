@@ -52,3 +52,24 @@ html[data-dmgram-reel-lock] [data-dmgram-reel-host] {
 html[data-dmgram-reel-lock] [data-dmgram-reel-extra] {
   display: none !important;
 }
+
+/* Home stories strip (surface STORIES): only the stories tray shows. cleanup.js marks the tray block
+   and its ancestors; every other branch of Instagram's home is display:none, so the hidden feed never
+   paginates or autoplays. Scoped to the home route: a story opened from the strip shows normally. */
+html[data-dmgram-surface="STORIES"][data-dmgram-route="HOME_FEED"],
+html[data-dmgram-surface="STORIES"][data-dmgram-route="HOME_FEED"] body {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+html[data-dmgram-surface="STORIES"][data-dmgram-route="HOME_FEED"] [data-dmgram-tray-path] > :not([data-dmgram-tray-path]):not([data-dmgram-tray]) {
+  display: none !important;
+}
+
+/* Home feed (surface FEED): room for the native stories strip above the first post.
+   Native sets --dmgram-strip (0 when there is no strip, e.g. logged out). */
+html[data-dmgram-surface="FEED"][data-dmgram-route="HOME_FEED"] body::before {
+  content: "";
+  display: block;
+  height: var(--dmgram-strip, 0px);
+}

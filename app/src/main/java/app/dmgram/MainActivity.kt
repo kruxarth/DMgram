@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.webkit.CookieManager
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
@@ -95,6 +96,10 @@ class MainActivity : ComponentActivity() {
             return
         }
         val container = FrameLayout(this)
+        // The stories strip slides up out of this box as the feed scrolls. WebView content ignores the plain
+        // child clip once translated, so clip at the render node: nothing may draw over the header.
+        container.outlineProvider = ViewOutlineProvider.BOUNDS
+        container.clipToOutline = true
         webContainer = container
         val requests = app.dmgram.web.MediaRequests(this)
         media = requests

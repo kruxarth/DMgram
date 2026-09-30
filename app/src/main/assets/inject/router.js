@@ -67,7 +67,18 @@
     return { class: "EXTERNAL", url: target.toString(), scheme: "https" };
   }
 
-  function policy(tab, raw, rules) {
+  // Pages the stories strip hands to the feed below it; mirrors STORIES_HANDOFF in NavPolicy.kt.
+  const STORIES_HANDOFF = { PROFILE: true, POST: true, REEL_SINGLE: true, DIRECT_THREAD: true, SEARCH: true, ACTIVITY: true };
+
+  function policy(tab, raw, rules, surface) {
+    const decision = basePolicy(tab, raw, rules);
+    if (surface === "STORIES" && decision.action === "ALLOW" && STORIES_HANDOFF[decision.class]) {
+      return { action: "FEED", class: decision.class, url: decision.url, tab: null };
+    }
+    return decision;
+  }
+
+  function basePolicy(tab, raw, rules) {
     const classified = classify(raw, rules);
     const route = classified.class;
     if (route === "EXPLORE_BLOCKED") return { action: "BLOCK", reason: "explore", class: route, url: classified.url, tab: null };
@@ -147,7 +158,7 @@
       const href = link.href || link.getAttribute("href") || "";
       let decision;
       try {
-        decision = policy(CONFIG.tab, href, CONFIG.rules);
+        decision = policy(CONFIG.tab, href, CONFIG.rules, CONFIG.surface);
       } catch (error) {
         window.__dmgramLog("error", error && error.stack ? error.stack : error);
         return;

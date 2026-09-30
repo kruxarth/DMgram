@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.webkit.WebView
@@ -54,6 +55,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 class TabController(
     private val activity: ComponentActivity,
@@ -67,7 +70,18 @@ class TabController(
     private val rulesRepository = RulesRepository(activity, prefs)
     private val updateChecker = UpdateChecker(prefs)
     private val main = Handler(Looper.getMainLooper())
-    private val slots = Tab.entries.associateWith { Slot(it) }
+    private val slots = Tab.entries.associateWith { Slot(it, if (it == Tab.HOME) Surface.FEED else Surface.PAGE) }
+
+    /** Home's second WebView: Instagram's normal home, trimmed to the stories tray, above the Following feed. */
+    private val stories = Slot(Tab.HOME, Surface.STORIES)
+    private val density = activity.resources.displayMetrics.density
+
+    /** Stories tray height in dp (0 until measured once); the strip's height and the feed's top spacer. */
+    private var trayDp = 0
+
+    /** Following feed scroll offset in dp, capped at Bridge.SCROLL_CAP. */
+    private var feedY = 0
+    private var followingRewriteAt = 0L
     private var rulesJson: String = "{}"
     private var compiled = CompiledRules(Rules())
     private var current = Tab.HOME
@@ -100,13 +114,15 @@ class TabController(
         compiled = CompiledRules(parsed)
         rulesVersion = parsed.version
         loggedIn = LoginState.isLoggedIn()
+        trayDp = prefs.getInt(KEY_TRAY_DP, 0).coerceIn(0, 400)
         create(Tab.HOME, load = true)
+        if (loggedIn) createSlot(stories, load = true)
         if (!incoming.isNullOrBlank()) openIncoming(incoming)
         publish()
     }
 
     fun snapshot(): FrameUi {
-        val slot = slots.getValue(current)
+        val slot = activeSlot()
         val chrome = visualChrome()
         return FrameUi(
             tab = current,
@@ -141,6 +157,7 @@ class TabController(
         if (slots.getValue(tab).web == null) create(tab, load = true)
         if (tab != current) {
             eval(slots.getValue(current).web, "pauseMedia()")
+            if (current == Tab.HOME) eval(stories.web, "pauseMedia()")
         }
         current = tab
         reveal(tab)
@@ -158,6 +175,9 @@ class TabController(
             val steps = stepsBackToRoot(web, tab)
             if (steps != null) {
                 eval(web, "go(${-steps})")
+            } else if (tab == Tab.HOME) {
+                // The Following variant only renders from a real load; an in-page push would show Instagram's home.
+                web.loadUrl(rootOf(tab))
             } else {
                 val path = tab.rootPath(username)
                 if (path != null) eval(web, "navigate(${jsQuote(path)})")
@@ -170,12 +190,13 @@ class TabController(
             slot.ready = false
             refreshing = true
             web.reload()
+            if (tab == Tab.HOME) stories.web?.reload()
             publish()
         }
     }
 
     fun onBack() {
-        val slot = slots.getValue(current)
+        val slot = activeSlot()
         if (slot.chrome?.isFullscreen() == true) {
             slot.chrome?.exitFullscreen()
             return
@@ -194,6 +215,11 @@ class TabController(
     }
 
     private fun continueBack(slot: Slot) {
+        if (slot.surface == Surface.STORIES) {
+            // Like the app: back leaves the story viewer entirely instead of stepping through each story.
+            closeStrip()
+            return
+        }
         val web = slot.web
         if (web != null && stepBack(web, slot)) return
         if (current != Tab.HOME) {
@@ -250,10 +276,14 @@ class TabController(
     }
 
     fun retryLoad() {
-        val slot = slots.getValue(current)
+        val slot = activeSlot()
         slot.loadError = null
         val web = slot.web
         if (web == null) create(current, load = true) else web.reload()
+        if (current == Tab.HOME && slot !== stories && stories.loadError != null) {
+            stories.loadError = null
+            stories.web?.reload()
+        }
         publish()
     }
 
@@ -279,7 +309,7 @@ class TabController(
 
     fun setSystemDark(dark: Boolean) {
         val color = windowBackground(dark)
-        for (slot in slots.values) {
+        for (slot in allSlots()) {
             slot.web?.setBackgroundColor(color)
             slot.swipe?.let { styleSwipe(it, dark) }
             eval(slot.web, "setSystemDark($dark)")
@@ -309,10 +339,12 @@ class TabController(
                 }
                 is NavAction.External -> openExternal(action.url)
                 is NavAction.System -> openSystem(action.url)
-                NavAction.Ignore -> Unit
+                // Feed only comes from the stories strip, never from decideIncoming.
+                NavAction.Ignore, NavAction.Feed -> Unit
                 NavAction.Allow, is NavAction.Switch -> {
                     select(Tab.HOME)
-                    slots.getValue(Tab.HOME).web?.loadUrl(decision.url)
+                    // Instagram's home link means DMGram's Home, which is already loaded.
+                    if (decision.route != RouteClass.HOME_FEED) slots.getValue(Tab.HOME).web?.loadUrl(decision.url)
                 }
             }
         }
@@ -321,11 +353,11 @@ class TabController(
     fun onHostStart() {
         foreground = true
         try {
-            slots.values.firstNotNullOfOrNull { it.web }?.resumeTimers()
+            allSlots().firstNotNullOfOrNull { it.web }?.resumeTimers()
         } catch (error: RuntimeException) {
             Log.e(DMGramApp.TAG, "resumeTimers failed", error)
         }
-        for (slot in slots.values) {
+        for (slot in allSlots()) {
             try {
                 slot.web?.onResume()
             } catch (error: RuntimeException) {
@@ -339,7 +371,7 @@ class TabController(
     fun onHostStop() {
         foreground = false
         remoteJob?.cancel()
-        for (slot in slots.values) {
+        for (slot in allSlots()) {
             try {
                 slot.web?.onPause()
             } catch (error: RuntimeException) {
@@ -347,7 +379,7 @@ class TabController(
             }
         }
         try {
-            slots.values.firstNotNullOfOrNull { it.web }?.pauseTimers()
+            allSlots().firstNotNullOfOrNull { it.web }?.pauseTimers()
         } catch (error: RuntimeException) {
             Log.e(DMGramApp.TAG, "pauseTimers failed", error)
         }
@@ -364,24 +396,103 @@ class TabController(
         jobs.cancel()
         hideNotice?.let { main.removeCallbacks(it) }
         for (tab in Tab.entries) destroy(tab)
+        destroySlot(stories)
     }
 
     fun applyRules(json: String) {
         rulesJson = json
         compiled = CompiledRules(Rules.parse(json))
-        for (slot in slots.values) {
+        for (slot in allSlots()) {
             val web = slot.web ?: continue
             try {
                 slot.script?.remove()
             } catch (error: RuntimeException) {
                 Log.e(DMGramApp.TAG, "Could not remove the document-start script", error)
             }
-            slot.script = InjectBundle.install(activity, web, slot.tab, rulesJson)
-            eval(web, "setConfig(${jsQuote(InjectBundle.configJson(slot.tab, rulesJson))})")
+            val strip = stripFor(slot)
+            slot.script = InjectBundle.install(activity, web, slot.tab, slot.surface, strip, rulesJson)
+            eval(web, "setConfig(${jsQuote(InjectBundle.configJson(slot.tab, slot.surface, strip, rulesJson))})")
         }
     }
 
+    private fun allSlots(): List<Slot> = slots.values + stories
+
+    /** The strip leaves its tray for a story (or the story composer): it then fills the screen. */
+    private fun storiesExpanded(): Boolean =
+        stories.web != null && stories.route != RouteClass.HOME_FEED
+
+    private fun activeSlot(): Slot =
+        if (current == Tab.HOME && storiesExpanded()) stories else slots.getValue(current)
+
+    /** Feed spacer in CSS px: the tray height while there is a strip, else nothing. */
+    private fun stripFor(slot: Slot): Int =
+        if (slot.surface == Surface.FEED && loggedIn && trayDp > 0) trayDp else 0
+
+    private fun stripPx(): Int = ((if (trayDp > 0) trayDp else DEFAULT_TRAY_DP) * density).roundToInt()
+
+    private fun onTray(heightDp: Int) {
+        if (heightDp == trayDp) return
+        trayDp = heightDp
+        prefs.edit().putInt(KEY_TRAY_DP, heightDp).apply()
+        Log.i(DMGramApp.TAG, "Stories tray is ${heightDp}dp")
+        val feed = slots.getValue(Tab.HOME)
+        eval(feed.web, "setStrip(${stripFor(feed)})")
+        layoutStrip()
+    }
+
+    /** Height, visibility and stacking of the strip; called on state changes, not per scroll frame. */
+    private fun layoutStrip() {
+        val web = stories.web ?: return
+        val feed = slots.getValue(Tab.HOME)
+        val expanded = storiesExpanded()
+        val show = current == Tab.HOME && loggedIn && stories.loadError == null && !feed.fullscreenVideo &&
+            (expanded || (trayDp > 0 && feed.route == RouteClass.HOME_FEED && feed.loadError == null))
+        val params = web.layoutParams as? FrameLayout.LayoutParams ?: return
+        val height = if (expanded) FrameLayout.LayoutParams.MATCH_PARENT else stripPx()
+        if (params.height != height) {
+            params.height = height
+            web.layoutParams = params
+        }
+        val visibility = if (show) View.VISIBLE else View.INVISIBLE
+        if (web.visibility != visibility) web.visibility = visibility
+        if (show && container.indexOfChild(web) != container.childCount - 1) web.bringToFront()
+        // Pull-to-refresh on the feed: the spinner comes out from under the strip.
+        val below = if (show && !expanded) stripPx() else 0
+        feed.swipe?.setProgressViewEndTarget(false, below + (SPINNER_GAP_DP * density).roundToInt())
+        positionStrip()
+    }
+
+    /** Per scroll frame: the strip scrolls away with the feed and returns at the top, like the app. */
+    private fun positionStrip() {
+        val web = stories.web ?: return
+        val offset = if (storiesExpanded()) 0f else -min(feedY * density, stripPx().toFloat())
+        if (web.translationY != offset) web.translationY = offset
+    }
+
+    /** A profile, post or thread tapped inside the strip opens in the feed below it. */
+    private fun handoff(url: String) {
+        closeStrip()
+        val feed = slots.getValue(Tab.HOME)
+        val web = feed.web ?: return
+        val path = try {
+            val uri = URI(url)
+            (uri.rawPath ?: "/") + (uri.rawQuery?.let { "?$it" } ?: "")
+        } catch (error: URISyntaxException) {
+            Log.e(DMGramApp.TAG, "Bad URL for the feed handoff", error)
+            return
+        }
+        if (current != Tab.HOME) select(Tab.HOME)
+        eval(web, "navigate(${jsQuote(path)})")
+    }
+
+    /** Back to the tray: Instagram's own home link closes a story viewer without a reload. */
+    private fun closeStrip() {
+        if (stories.web == null || !storiesExpanded()) return
+        eval(stories.web, "navigate(${jsQuote("/")})")
+    }
+
     private fun visualChrome(): Chrome {
+        if (current == Tab.HOME && storiesExpanded()) return Chrome(false, false, true, false)
         val slot = slots.getValue(current)
         if (!loggedIn) return Chrome(false, false, false, false)
         if (slot.fullscreenVideo || slot.reelLocked) return Chrome(false, false, true, false)
@@ -391,10 +502,12 @@ class TabController(
         return chrome
     }
 
-    private fun create(tab: Tab, load: Boolean) {
-        val slot = slots.getValue(tab)
+    private fun create(tab: Tab, load: Boolean) = createSlot(slots.getValue(tab), load)
+
+    private fun createSlot(slot: Slot, load: Boolean) {
         if (slot.web != null) return
-        val root = tab.rootUrl(username) ?: return
+        val tab = slot.tab
+        val root = rootOfSlot(slot) ?: return
         val dark = isDark()
         val web = WebView(activity)
         web.setBackgroundColor(windowBackground(dark))
@@ -442,7 +555,26 @@ class TabController(
         Bridge.attach(web) { event ->
             activity.runOnUiThread { onBridge(slot, event) }
         }
-        val script = InjectBundle.install(activity, web, tab, rulesJson)
+        val script = InjectBundle.install(activity, web, tab, slot.surface, stripFor(slot), rulesJson)
+        if (slot.surface == Surface.STORIES) {
+            // No pull-to-refresh of its own: it sits over the feed, which refreshes both.
+            web.layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                stripPx(),
+                Gravity.TOP,
+            )
+            web.visibility = View.INVISIBLE
+            container.addView(web)
+            slot.web = web
+            slot.chrome = chrome
+            slot.script = script
+            slot.url = root
+            slot.route = RouteClass.HOME_FEED
+            layoutStrip()
+            if (load) web.loadUrl(root)
+            Log.i(DMGramApp.TAG, "Created HOME stories WebView")
+            return
+        }
         val swipe = SwipeRefreshLayout(activity)
         swipe.layoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -468,8 +600,12 @@ class TabController(
         Log.i(DMGramApp.TAG, "Created ${tab.name} WebView")
     }
 
-    private fun destroy(tab: Tab) {
-        val slot = slots.getValue(tab)
+    private fun rootOfSlot(slot: Slot): String? =
+        if (slot.surface == Surface.STORIES) STORIES_URL else slot.tab.rootUrl(username)
+
+    private fun destroy(tab: Tab) = destroySlot(slots.getValue(tab))
+
+    private fun destroySlot(slot: Slot) {
         val web = slot.web ?: return
         try {
             slot.script?.remove()
@@ -482,14 +618,15 @@ class TabController(
         val swipe = slot.swipe
         slot.web = null
         slot.swipe = null
-        if (swipe != null) container.removeView(swipe)
+        container.removeView(swipe ?: web)
         web.destroy()
         slot.ready = false
         slot.progress = 0
         slot.reelLocked = false
         slot.fullscreenVideo = false
         slot.canGoBack = false
-        Log.i(DMGramApp.TAG, "Destroyed ${tab.name} WebView")
+        slot.loadError = null
+        Log.i(DMGramApp.TAG, "Destroyed ${slot.tab.name} ${slot.surface.name} WebView")
     }
 
     private fun reveal(tab: Tab) {
@@ -498,10 +635,19 @@ class TabController(
             slot.swipe?.visibility = if (visible) View.VISIBLE else View.INVISIBLE
             if (visible) slot.swipe?.bringToFront()
         }
+        layoutStrip()
     }
 
     private fun onBridge(slot: Slot, event: BridgeEvent) {
         if (slot.web == null) return
+        // Per-frame while the feed scrolls: move the strip only, never recompose the frame.
+        if (event is BridgeEvent.ScrollY) {
+            if (slot.surface == Surface.FEED) {
+                feedY = event.y
+                positionStrip()
+            }
+            return
+        }
         when (event) {
             is BridgeEvent.Route -> onRoute(slot, event.url, event.index)
             is BridgeEvent.Navigate -> onNavigate(slot, event.url)
@@ -510,8 +656,10 @@ class TabController(
                 showBlocked()
             }
             is BridgeEvent.Unread -> {
-                if (slot.tab == Tab.HOME) homeUnread = event.count.coerceAtLeast(0)
+                if (slot.tab == Tab.HOME && slot.surface != Surface.STORIES) homeUnread = event.count.coerceAtLeast(0)
             }
+            is BridgeEvent.Tray -> if (slot.surface == Surface.STORIES) onTray(event.height)
+            is BridgeEvent.ScrollY -> Unit
             is BridgeEvent.Username -> onUsername(event.value)
             is BridgeEvent.Avatar -> {
                 if (slot.tab == Tab.HOME) {
@@ -531,7 +679,7 @@ class TabController(
                 slot.ready = true
                 refreshing = false
                 slot.swipe?.isRefreshing = false
-                if (slot.tab == Tab.HOME) onHomeReady()
+                if (slot.tab == Tab.HOME && slot.surface == Surface.FEED) onHomeReady()
             }
             is BridgeEvent.Log -> Log.i(DMGramApp.TAG, "${event.level} ${event.msg}")
             is BridgeEvent.ReelLock -> {
@@ -612,8 +760,20 @@ class TabController(
         slot.url = url
         if (index >= 0) slot.historyIndex = index
         slot.canGoBack = slot.web?.canGoBack() == true
-        val decision = decide(slot.tab, url, compiled)
+        val decision = decide(slot.tab, url, compiled, slot.surface)
         slot.route = decision.route
+        if (slot.surface == Surface.FEED) {
+            eval(slot.web, "setStrip(${stripFor(slot)})")
+            val now = SystemClock.uptimeMillis()
+            if (decision.route == RouteClass.HOME_FEED && !url.contains(FOLLOWING_QUERY) && loggedIn &&
+                now - followingRewriteAt > REWRITE_GAP_MS
+            ) {
+                // Instagram's own "home" (after login, a logo link) is the ranked feed with ads. Home is Following.
+                // Rate-limited so a server redirect away from the Following variant can never become a reload loop.
+                followingRewriteAt = now
+                slot.web?.loadUrl(rootOf(Tab.HOME))
+            }
+        }
         if (BuildConfig.DEBUG) {
             Log.d(DMGramApp.TAG, "route ${slot.tab.name} ${decision.route} ${decision.action.name} $url")
         }
@@ -622,7 +782,11 @@ class TabController(
                 if (!slot.rewinding) {
                     slot.rewinding = true
                     val web = slot.web
-                    if (web == null || !stepBack(web, slot)) web?.loadUrl(rootOf(slot.tab))
+                    if (slot.surface == Surface.STORIES) {
+                        closeStrip()
+                    } else if (web == null || !stepBack(web, slot)) {
+                        web?.loadUrl(rootOf(slot.tab))
+                    }
                     showBlocked()
                 }
             }
@@ -630,10 +794,15 @@ class TabController(
                 if (!slot.rewinding) {
                     slot.rewinding = true
                     val web = slot.web
-                    if (web == null || !stepBack(web, slot)) web?.loadUrl(rootOf(slot.tab))
+                    if (slot.surface == Surface.STORIES) {
+                        closeStrip()
+                    } else if (web == null || !stepBack(web, slot)) {
+                        web?.loadUrl(rootOf(slot.tab))
+                    }
                     if (current == slot.tab) select(action.tab)
                 }
             }
+            NavAction.Feed -> handoff(url)
             else -> slot.rewinding = false
         }
         if (slot.tab == Tab.HOME) {
@@ -644,9 +813,13 @@ class TabController(
     }
 
     private fun onNavigate(slot: Slot, url: String) {
-        val decision = decide(slot.tab, url, compiled)
+        val decision = decide(slot.tab, url, compiled, slot.surface)
         when (val action = decision.action) {
-            is NavAction.Switch -> select(action.tab)
+            NavAction.Feed -> handoff(decision.url)
+            is NavAction.Switch -> {
+                if (slot.surface == Surface.STORIES) closeStrip()
+                select(action.tab)
+            }
             is NavAction.External -> openExternal(action.url)
             is NavAction.System -> openSystem(action.url)
             is NavAction.Block -> showBlocked()
@@ -655,9 +828,13 @@ class TabController(
     }
 
     private fun onOverride(slot: Slot, url: String): Boolean {
-        val decision = decide(slot.tab, url, compiled)
+        val decision = decide(slot.tab, url, compiled, slot.surface)
         return when (val action = decision.action) {
             NavAction.Allow -> false
+            NavAction.Feed -> {
+                handoff(decision.url)
+                true
+            }
             is NavAction.Block -> {
                 Log.i(DMGramApp.TAG, "Override blocked ${action.reason} $url")
                 showBlocked()
@@ -682,7 +859,8 @@ class TabController(
     private fun onFinished(slot: Slot, url: String) {
         slot.url = url
         slot.canGoBack = slot.web?.canGoBack() == true
-        slot.route = decide(slot.tab, url, compiled).route
+        slot.route = decide(slot.tab, url, compiled, slot.surface).route
+        if (slot.surface == Surface.FEED) eval(slot.web, "setStrip(${stripFor(slot)})")
         refreshing = false
         slot.swipe?.isRefreshing = false
         if (slot.tab == Tab.HOME) {
@@ -727,15 +905,16 @@ class TabController(
         refreshing = true
         slot.ready = false
         slot.web?.reload()
+        if (slot.surface == Surface.FEED) stories.web?.reload()
         publish()
     }
 
     private fun onRendererGone(dead: WebView) {
-        val slot = slots.values.firstOrNull { it.web === dead } ?: return
-        Log.e(DMGramApp.TAG, "Recreating ${slot.tab.name} after renderer exit")
+        val slot = allSlots().firstOrNull { it.web === dead } ?: return
+        Log.e(DMGramApp.TAG, "Recreating ${slot.tab.name} ${slot.surface.name} after renderer exit")
         val wasCurrent = slot.tab == current
-        destroy(slot.tab)
-        create(slot.tab, load = true)
+        destroySlot(slot)
+        if (slot.surface != Surface.STORIES || loggedIn) createSlot(slot, load = true)
         if (wasCurrent) reveal(slot.tab)
         publish()
     }
@@ -749,6 +928,7 @@ class TabController(
         loggedIn = now
         if (now) {
             Log.i(DMGramApp.TAG, "Logged in")
+            createSlot(stories, load = true)
             maybePreloadDms()
         } else {
             Log.i(DMGramApp.TAG, "Logged out")
@@ -758,6 +938,8 @@ class TabController(
             prefs.edit().remove(KEY_USERNAME).apply()
             destroy(Tab.DMS)
             destroy(Tab.PROFILE)
+            destroySlot(stories)
+            eval(slots.getValue(Tab.HOME).web, "setStrip(0)")
             if (current != Tab.HOME) current = Tab.HOME
             reveal(Tab.HOME)
         }
@@ -807,6 +989,7 @@ class TabController(
             slot.swipe?.isEnabled = chrome.pullToRefresh && slot.tab == current && slot.atTop
             if (slot.tab == current) slot.swipe?.isRefreshing = refreshing
         }
+        layoutStrip()
         onChanged()
     }
 
@@ -818,7 +1001,7 @@ class TabController(
             Log.e(DMGramApp.TAG, "Bad URL while checking the tab root", error)
             return false
         }
-        val root = tab.rootPath(username) ?: return false
+        val root = tab.rootPath(username)?.substringBefore('?') ?: return false
         return path.trimEnd('/') == root.trimEnd('/')
     }
 
@@ -938,7 +1121,7 @@ class TabController(
         return mode == android.content.res.Configuration.UI_MODE_NIGHT_YES
     }
 
-    private class Slot(val tab: Tab) {
+    private class Slot(val tab: Tab, val surface: Surface) {
         var web: WebView? = null
         var swipe: SwipeRefreshLayout? = null
         var chrome: DMGramChromeClient? = null
@@ -961,6 +1144,14 @@ class TabController(
         private const val PREFS = "dmgram"
         private const val KEY_USERNAME = "username"
         private const val KEY_UPDATE_DISMISSED = "update.dismissed"
+        private const val KEY_TRAY_DP = "home.trayDp"
+        private const val STORIES_URL = "https://www.instagram.com/"
+        private const val FOLLOWING_QUERY = "variant=following"
+
+        /** Strip height before the tray was ever measured: Instagram's tray at the default font scale. */
+        private const val DEFAULT_TRAY_DP = 124
+        private const val SPINNER_GAP_DP = 64
+        private const val REWRITE_GAP_MS = 5_000L
         private const val NOTICE_MS = 2_000L
         private const val BLOCK_GAP_MS = 3_000L
     }

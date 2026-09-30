@@ -5,6 +5,7 @@ import android.webkit.WebView
 import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
 import app.dmgram.BuildConfig
+import app.dmgram.tabs.Surface
 import app.dmgram.tabs.Tab
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -14,20 +15,23 @@ import kotlinx.serialization.json.put
 object InjectBundle {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun install(context: Context, webView: WebView, tab: Tab, rulesJson: String): ScriptHandler =
-        WebViewCompat.addDocumentStartJavaScript(webView, script(context, tab, rulesJson), Bridge.ORIGINS)
+    fun install(context: Context, webView: WebView, tab: Tab, surface: Surface, strip: Int, rulesJson: String): ScriptHandler =
+        WebViewCompat.addDocumentStartJavaScript(webView, script(context, tab, surface, strip, rulesJson), Bridge.ORIGINS)
 
-    fun configJson(tab: Tab, rulesJson: String): String {
+    /** [strip] is the stories strip height in CSS px; the FEED reserves that much space above its first post. */
+    fun configJson(tab: Tab, surface: Surface, strip: Int, rulesJson: String): String {
         val rules = json.parseToJsonElement(rulesJson)
         return buildJsonObject {
             put("tab", tab.name)
+            put("surface", surface.name)
+            put("strip", strip)
             put("debug", BuildConfig.DEBUG)
             put("rules", rules as? JsonObject ?: buildJsonObject {})
         }.toString()
     }
 
-    fun script(context: Context, tab: Tab, rulesJson: String): String {
-        val config = embedJson(configJson(tab, rulesJson))
+    fun script(context: Context, tab: Tab, surface: Surface, strip: Int, rulesJson: String): String {
+        val config = embedJson(configJson(tab, surface, strip, rulesJson))
         val bridge = asset(context, "inject/bridge.js")
         val router = asset(context, "inject/router.js")
         val cleanup = asset(context, "inject/cleanup.js")

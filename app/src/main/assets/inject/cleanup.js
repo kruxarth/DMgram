@@ -53,26 +53,6 @@ function hideNag(el) {
   hide(el.closest("button, [role='button'], a") || el);
 }
 
-let caughtMarker = null;
-
-function cutAfter(marker) {
-  caughtMarker = marker;
-  document.documentElement.setAttribute("data-dmgram-caught", "");
-  let node = marker;
-  for (let depth = 0; depth < 6 && node && node.parentElement && node !== document.body; depth += 1) {
-    let sibling = node.nextElementSibling;
-    let guard = 0;
-    while (sibling && guard < 8) {
-      conceal(sibling);
-      sibling = sibling.nextElementSibling;
-      guard += 1;
-    }
-    const parent = node.parentElement;
-    if (sibling || parent.childElementCount > 8) break;
-    node = parent;
-  }
-}
-
 function maybeHideUnfollowed(el) {
   const follow = markerList("follow");
   const control = el.closest("button, [role='button']");
@@ -92,10 +72,6 @@ function classify(el) {
   }
   if ((label && markerList("nags").has(label)) || markerList("nags").has(named)) {
     hideNag(el);
-    return;
-  }
-  if ((label && markerList("caughtUp").has(label)) || markerList("caughtUp").has(named)) {
-    if (!caught()) cutAfter(el);
     return;
   }
   if (label && (markerList("sponsored").has(label) || markerList("suggested").has(label))) {
@@ -125,17 +101,6 @@ function markChrome() {
       el = el.parentElement;
     }
   }
-}
-
-function caught() {
-  return document.documentElement.hasAttribute("data-dmgram-caught");
-}
-
-function hideFreshArticle(article) {
-  if (!article || article.hasAttribute("data-dmgram-hidden")) return;
-  // Instagram mounts and re-mounts posts above the marker late too. Only posts below it are past "caught up".
-  if (caughtMarker && caughtMarker.isConnected && !(caughtMarker.compareDocumentPosition(article) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
-  hide(article);
 }
 
 function isLabel(el) {
@@ -174,7 +139,100 @@ function scanArticle(article) {
   }
 }
 
-const lateNodes = new WeakSet();
+// ---- Home stories strip (surface STORIES) ----
+// The strip loads Instagram's normal home only for its stories tray. Mark the tray block and the path
+// above it; hide.css then switches off everything else, so the feed never shows, paginates or plays.
+
+let trayBlock = null;
+let trayHeight = 0;
+let traySizer = null;
+
+function isHorizontalScroller(el) {
+  if (!el || el.nodeType !== 1 || el.scrollWidth <= el.clientWidth + 8) return false;
+  const overflow = getComputedStyle(el).overflowX;
+  return overflow === "auto" || overflow === "scroll";
+}
+
+function findTrayScroller() {
+  const main = document.querySelector("main");
+  if (!main) return null;
+  // English label first; then by shape: the first horizontal scroller holding several buttons.
+  const starts = [];
+  const labelled = main.querySelector('[aria-label^="Story by"]');
+  if (labelled) starts.push(labelled);
+  const buttons = main.querySelectorAll('[role="button"]');
+  for (let i = 0; i < buttons.length && i < 30; i += 1) starts.push(buttons[i]);
+  for (const start of starts) {
+    let el = start.parentElement;
+    for (let depth = 0; depth < 8 && el && el !== main; depth += 1) {
+      if (isHorizontalScroller(el) && el.querySelectorAll('[role="button"]').length >= 2) return el;
+      el = el.parentElement;
+    }
+  }
+  return null;
+}
+
+function trayBlockFrom(scroller) {
+  const limit = scroller.getBoundingClientRect().height + 40;
+  let block = scroller;
+  while (block.parentElement && block.parentElement !== document.body) {
+    const parent = block.parentElement;
+    if (parent.tagName === "MAIN" || parent.querySelector("article")) break;
+    if (parent.getBoundingClientRect().height > limit) break;
+    block = parent;
+  }
+  return block;
+}
+
+function clearTray() {
+  document.querySelectorAll("[data-dmgram-tray], [data-dmgram-tray-path]").forEach((el) => {
+    el.removeAttribute("data-dmgram-tray");
+    el.removeAttribute("data-dmgram-tray-path");
+  });
+  if (traySizer) traySizer.disconnect();
+  traySizer = null;
+  trayBlock = null;
+}
+
+function publishTray() {
+  if (!trayBlock || !trayBlock.isConnected) return;
+  const bottom = Math.ceil(trayBlock.getBoundingClientRect().bottom + (window.scrollY || 0));
+  if (bottom < 20 || bottom === trayHeight) return;
+  trayHeight = bottom;
+  window.__dmgramPost({ type: "tray", height: bottom });
+}
+
+function markTray() {
+  if (CONFIG.surface !== "STORIES") return;
+  if ((window.__dmgram && window.__dmgram.route) !== "HOME_FEED") return;
+  // Re-mark when the block vanished, or when it grew to take in the feed (it was marked before posts loaded).
+  if (trayBlock && trayBlock.isConnected && !trayBlock.querySelector("article")) return;
+  clearTray();
+  const scroller = findTrayScroller();
+  if (!scroller) return;
+  trayBlock = trayBlockFrom(scroller);
+  trayBlock.setAttribute("data-dmgram-tray", "");
+  for (let el = trayBlock.parentElement; el; el = el.parentElement) {
+    el.setAttribute("data-dmgram-tray-path", "");
+    if (el === document.body) break;
+  }
+  if (typeof ResizeObserver === "function") {
+    traySizer = new ResizeObserver(publishTray);
+    traySizer.observe(trayBlock);
+  }
+  publishTray();
+}
+
+if (CONFIG.surface === "STORIES" && window.__dmgram && window.__dmgram.on) {
+  // Back from a story: the strip shows the top of the page again.
+  window.__dmgram.on("route", (dmgram) => {
+    if (dmgram.route !== "HOME_FEED") return;
+    window.scrollTo(0, 0);
+    trayHeight = 0;
+    markTray();
+  });
+}
+
 const kidCursor = new WeakMap();
 let pending = [];
 let pendingAt = 0;
@@ -183,9 +241,8 @@ let samples = 0;
 let sampleSum = 0;
 let maxMs = 0;
 
-function enqueue(node, late) {
+function enqueue(node) {
   if (!node || node.nodeType !== 1) return;
-  if (late) lateNodes.add(node);
   pending.push(node);
 }
 
@@ -199,30 +256,30 @@ function takePending() {
 
 function scanNode(node) {
   if (!node || node.nodeType !== 1 || node.hasAttribute("data-dmgram-hidden")) return;
-  const late = lateNodes.has(node);
   if (node === document.body || node === document.documentElement) {
-    for (const child of node.children) enqueue(child, late);
+    for (const child of node.children) enqueue(child);
     return;
   }
   if (node.tagName === "ARTICLE") {
-    if (late) hideFreshArticle(node);
-    else scanArticle(node);
+    // The stories strip never shows its feed (hide.css switches it off), so its posts aren't worth scanning.
+    if (CONFIG.surface !== "STORIES") scanArticle(node);
     return;
   }
   const resume = kidCursor.get(node) || 0;
-  if (!resume && !late) classifyIfLabel(node);
+  if (!resume) classifyIfLabel(node);
   const kids = node.children;
   const end = Math.min(kids.length, resume + 12);
-  for (let i = resume; i < end; i += 1) enqueue(kids[i], late);
+  for (let i = resume; i < end; i += 1) enqueue(kids[i]);
   if (end < kids.length) {
     kidCursor.set(node, end);
-    enqueue(node, late);
+    enqueue(node);
   } else if (resume) kidCursor.delete(node);
 }
 
 function flush() {
   scheduled = false;
   markChrome();
+  markTray();
   const started = performance.now();
   let processed = 0;
   while (pendingAt < pending.length && processed < 5 && performance.now() - started < 1) {
@@ -272,7 +329,6 @@ function applyRemoteRules() {
   style.textContent = parts.join("\n");
   markerList("similar");
   markerList("nags");
-  markerList("caughtUp");
   markerList("sponsored");
   markerList("suggested");
   markerList("follow");
@@ -312,14 +368,13 @@ function scheduleChrome() {
 
 const cleanupObserver = new MutationObserver((records) => {
   const started = performance.now();
-  const late = caught();
   for (const record of records) {
     const added = record.addedNodes;
     if (added.length > 8 && record.target && record.target.nodeType === 1) {
-      enqueue(record.target, late);
+      enqueue(record.target);
       continue;
     }
-    for (const node of added) enqueue(node, late);
+    for (const node of added) enqueue(node);
   }
   const elapsed = performance.now() - started;
   if (CONFIG.debug && window.__dmgramLog && elapsed > 2) {

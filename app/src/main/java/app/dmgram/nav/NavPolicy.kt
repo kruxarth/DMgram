@@ -1,5 +1,6 @@
 package app.dmgram.nav
 
+import app.dmgram.tabs.Surface
 import app.dmgram.tabs.Tab
 
 sealed class NavAction {
@@ -10,6 +11,9 @@ sealed class NavAction {
     data class System(val url: String) : NavAction()
     data object Ignore : NavAction()
 
+    /** Only from the stories strip: open this page in the Home feed WebView instead. */
+    data object Feed : NavAction()
+
     val name: String
         get() = when (this) {
             Allow -> "ALLOW"
@@ -18,6 +22,7 @@ sealed class NavAction {
             is External -> "EXTERNAL"
             is System -> "SYSTEM"
             Ignore -> "IGNORE"
+            Feed -> "FEED"
         }
 }
 
@@ -27,11 +32,27 @@ data class NavDecision(
     val url: String,
 )
 
-fun decide(tab: Tab, rawUrl: String, rules: CompiledRules): NavDecision {
+fun decide(tab: Tab, rawUrl: String, rules: CompiledRules, surface: Surface = Surface.PAGE): NavDecision {
     val classified = classify(rawUrl, rules)
     val action = actionFor(tab, classified)
+    if (surface == Surface.STORIES && action == NavAction.Allow && classified.route in STORIES_HANDOFF) {
+        return NavDecision(classified.route, NavAction.Feed, classified.url)
+    }
     return NavDecision(classified.route, action, classified.url)
 }
+
+/**
+ * Pages the stories strip hands to the feed below it (a username tapped in the story viewer, "Send message").
+ * Anything else, including routes we don't know such as Instagram's story composer, stays in the strip.
+ */
+private val STORIES_HANDOFF = setOf(
+    RouteClass.PROFILE,
+    RouteClass.POST,
+    RouteClass.REEL_SINGLE,
+    RouteClass.DIRECT_THREAD,
+    RouteClass.SEARCH,
+    RouteClass.ACTIVITY,
+)
 
 /**
  * Routes another app may open inside the logged-in WebView. MainActivity is exported, so any app can send

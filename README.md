@@ -10,6 +10,8 @@ You keep Instagram because your friends are there: their stories, their posts, y
 
 No Reels tab. No Explore page. No suggested posts, no ads, no "you might like".
 
+It's also **built to keep your account safe**: DMGram is simply Instagram's own website, used the way your phone's browser uses it. It doesn't pose as the Instagram app or automate anything, which is what gets third-party Instagram apps' users banned. [More on that below.](#will-my-account-get-banned)
+
 DMGram is free, open source, and not affiliated with Instagram or Meta.
 
 ## What it does
@@ -111,9 +113,19 @@ DMGram can only do what Instagram's mobile website can do, and a few things are 
 - **No feed posts.** Instagram's mobile website has no way to create them. "Your story" on Home opens Instagram's own story flow.
 - **It depends on Instagram's website.** If Instagram changes something, a part of the app can misbehave until a fix ships.
 
-## Is my account safe?
+## Will my account get banned?
 
-DMGram doesn't use any private Instagram interface, doesn't automate anything, and doesn't send Instagram anything its website wouldn't. To Instagram it looks like someone using instagram.com in a phone browser. That's the safest way an unofficial app can work, but it is still unofficial: use it at your own discretion.
+It's very unlikely, and here's why. Instagram flags accounts that behave like bots: logging in through apps that pretend to be the official Instagram app, automated likes, follows or messages, scraping, logging in from servers. DMGram does none of that:
+
+- **It's Instagram's own website.** Every page and every request comes from instagram.com's own code, exactly as in Chrome on your phone. DMGram doesn't use Instagram's private app interface and doesn't send Instagram anything the website wouldn't.
+- **Nothing is automated.** Nothing happens on your account unless you tap it.
+- **You log in on Instagram's own page, from your own phone.** Your login never passes through anyone's server.
+- **Nothing runs in the background.** When DMGram is closed, it does nothing.
+- **Hiding happens only on your screen**, like an ad blocker in a browser. Instagram isn't told anything different.
+
+To Instagram, you look like one of the many people using instagram.com in their phone's browser.
+
+The honest fine print: DMGram is unofficial, and Instagram enforces its own rules, so no one outside Meta can promise what Instagram will do. But DMGram is deliberately built to be indistinguishable from a normal browser, which is as safe as an unofficial app can be.
 
 ## Building it yourself
 

@@ -4,111 +4,172 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
+import android.view.ViewGroup
 import android.webkit.CookieManager
-import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewFeature
+import app.dmgram.tabs.FrameUi
+import app.dmgram.tabs.TabController
+import app.dmgram.ui.AboutSheet
+import app.dmgram.ui.AboutState
+import app.dmgram.ui.BlockedNotice
+import app.dmgram.ui.BlockedNoticeState
+import app.dmgram.ui.ErrorKind
+import app.dmgram.ui.ErrorState
+import app.dmgram.ui.HomeHeader
+import app.dmgram.ui.LoadingOverlay
+import app.dmgram.ui.TabBar
 import app.dmgram.ui.theme.DMGramTheme
-import app.dmgram.ui.theme.Dimens
 import app.dmgram.ui.theme.windowBackground
-import app.dmgram.web.DMGramWebViewClient
 import app.dmgram.web.WebViewFactory
 
 class MainActivity : ComponentActivity() {
-    private lateinit var webContainer: FrameLayout
-    private var webView: WebView? = null
+    private var night by mutableStateOf(false)
+    private var frame by mutableStateOf(FrameUi())
     private var featuresSupported = false
+    private var homeReady = false
+    private var splashStarted = 0L
+    private var webContainer: FrameLayout? = null
+    private var controller: TabController? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splash = installSplashScreen()
+        splashStarted = SystemClock.uptimeMillis()
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        night = isDark()
+        splash.setKeepOnScreenCondition {
+            !homeReady && SystemClock.uptimeMillis() - splashStarted < SPLASH_MS
+        }
         featuresSupported = requiredFeatures()
         logFeatureSupport()
-        if (featuresSupported) {
-            webContainer = FrameLayout(this)
-            mountWebView()
-        }
-        setContent {
-            DMGramTheme {
-                if (featuresSupported) {
-                    AndroidView(
-                        factory = {
-                            (webContainer.parent as? android.view.ViewGroup)?.removeView(webContainer)
-                            webContainer
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    WebViewUpdateRequired(onOpenStore = ::openWebViewStore)
+        if (!featuresSupported) {
+            homeReady = true
+            setContent {
+                DMGramTheme(dark = night) {
+                    ErrorState(ErrorKind.WEBVIEW_UPDATE, onRetry = ::openWebViewStore)
                 }
+            }
+            return
+        }
+        val container = FrameLayout(this)
+        webContainer = container
+        val tabs = TabController(
+            activity = this,
+            container = container,
+            onHomeReady = { homeReady = true },
+            onChanged = { frame = controller?.snapshot() ?: FrameUi() },
+        )
+        controller = tabs
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    tabs.onBack()
+                }
+            },
+        )
+        val incoming = if (intent?.action == Intent.ACTION_VIEW) intent?.dataString else null
+        tabs.start(incoming)
+        frame = tabs.snapshot()
+        setContent {
+            DMGramTheme(dark = night) {
+                DmgramFrame(
+                    frame = frame,
+                    systemDark = night,
+                    container = container,
+                    onKeyboard = tabs::setKeyboardOpen,
+                    onSelect = tabs::select,
+                    onReselect = tabs::reselect,
+                    onTitle = tabs::openAbout,
+                    onSearch = tabs::openSearch,
+                    onActivity = tabs::openActivity,
+                    onDismissAbout = tabs::dismissAbout,
+                )
             }
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == Intent.ACTION_VIEW) {
+            val url = intent.dataString ?: return
+            controller?.openIncoming(url)
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        controller?.onHostStart()
+    }
+
     override fun onStop() {
-        CookieManager.getInstance().flush()
+        controller?.onHostStop()
+        try {
+            CookieManager.getInstance().flush()
+        } catch (error: RuntimeException) {
+            Log.e(DMGramApp.TAG, "Cookie flush failed", error)
+        }
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        controller?.destroyAll()
+        controller = null
+        webContainer = null
+        super.onDestroy()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        applyWindowBackground()
+        val dark = isDark()
+        night = dark
+        controller?.setSystemDark(dark)
+        window.decorView.setBackgroundColor(windowBackground(frame.pageDark ?: dark))
     }
 
-    private fun mountWebView() {
-        val view = WebView(this)
-        view.layoutParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT,
-        )
-        view.setBackgroundColor(windowBackground(isDark()))
-        WebViewFactory.configure(view)
-        view.webViewClient = DMGramWebViewClient(onRendererGone = { replaceWebView(view) })
-        webContainer.addView(view)
-        webView = view
-        applyWindowBackground()
-        view.loadUrl(HOME_URL)
-    }
-
-    private fun replaceWebView(dead: WebView) {
-        if (webView !== dead) return
-        webContainer.removeView(dead)
-        webView = null
-        dead.destroy()
-        mountWebView()
-    }
-
-    private fun applyWindowBackground() {
-        val color = windowBackground(isDark())
-        window.decorView.setBackgroundColor(color)
-        webView?.setBackgroundColor(color)
-    }
-
-    private fun isDark(): Boolean {
-        val mode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-        return mode == Configuration.UI_MODE_NIGHT_YES
-    }
-
-    private fun requiredFeatures(): Boolean {
-        return try {
-            WebViewFactory.requiredFeaturesSupported()
-        } catch (error: RuntimeException) {
-            Log.e(DMGramApp.TAG, "WebView feature check failed", error)
-            false
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level == TRIM_MEMORY_RUNNING_CRITICAL || level >= TRIM_MEMORY_BACKGROUND) {
+            controller?.onTrim()
         }
+    }
+
+    private fun requiredFeatures(): Boolean = try {
+        WebViewFactory.requiredFeaturesSupported()
+    } catch (error: RuntimeException) {
+        Log.e(DMGramApp.TAG, "WebView feature check failed", error)
+        false
     }
 
     private fun logFeatureSupport() {
@@ -120,13 +181,12 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun flag(feature: String): Boolean =
-        try {
-            WebViewFeature.isFeatureSupported(feature)
-        } catch (error: RuntimeException) {
-            Log.e(DMGramApp.TAG, "Feature check failed for $feature", error)
-            false
-        }
+    private fun flag(feature: String): Boolean = try {
+        WebViewFeature.isFeatureSupported(feature)
+    } catch (error: RuntimeException) {
+        Log.e(DMGramApp.TAG, "Feature check failed for $feature", error)
+        false
+    }
 
     private fun openWebViewStore() {
         val intent = Intent(
@@ -140,23 +200,94 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun isDark(): Boolean {
+        val mode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return mode == Configuration.UI_MODE_NIGHT_YES
+    }
+
     companion object {
-        const val HOME_URL = "https://www.instagram.com/?variant=following"
+        private const val SPLASH_MS = 3_000L
     }
 }
 
 @Composable
-private fun WebViewUpdateRequired(onOpenStore: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(Dimens.screenPadding),
-        verticalArrangement = Arrangement.spacedBy(Dimens.stackGap, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(stringResource(R.string.webview_update_required))
-        Button(onClick = onOpenStore) {
-            Text(stringResource(R.string.webview_update_action))
+private fun DmgramFrame(
+    frame: FrameUi,
+    systemDark: Boolean,
+    container: FrameLayout,
+    onKeyboard: (Boolean) -> Unit,
+    onSelect: (app.dmgram.tabs.Tab) -> Unit,
+    onReselect: (app.dmgram.tabs.Tab) -> Unit,
+    onTitle: () -> Unit,
+    onSearch: () -> Unit,
+    onActivity: () -> Unit,
+    onDismissAbout: () -> Unit,
+) {
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val keyboard = WindowInsets.ime.getBottom(density) > 0
+    val pageDark = frame.pageDark ?: systemDark
+    SideEffect {
+        onKeyboard(keyboard)
+        val window = (view.context as? ComponentActivity)?.window ?: return@SideEffect
+        WindowInsetsControllerCompat(window, view).apply {
+            isAppearanceLightStatusBars = !pageDark
+            isAppearanceLightNavigationBars = !pageDark
+        }
+        window.decorView.setBackgroundColor(windowBackground(pageDark))
+    }
+    val top = if (frame.fullScreen) Modifier else Modifier.statusBarsPadding()
+    val bottom = when {
+        frame.fullScreen -> WindowInsets(0, 0, 0, 0)
+        keyboard -> WindowInsets.ime.union(WindowInsets.navigationBars)
+        !frame.showTabBar -> WindowInsets.navigationBars
+        else -> WindowInsets(0, 0, 0, 0)
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().then(top)) {
+            if (frame.showHomeHeader) {
+                HomeHeader(
+                    onTitleClick = onTitle,
+                    onSearch = onSearch,
+                    onActivity = onActivity,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .windowInsetsPadding(bottom),
+            ) {
+                AndroidView(
+                    factory = {
+                        (container.parent as? ViewGroup)?.removeView(container)
+                        container
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+                LoadingOverlay(progress = frame.progress, ready = frame.ready)
+            }
+            if (frame.showTabBar) {
+                Box(modifier = Modifier.navigationBarsPadding()) {
+                    TabBar(
+                        current = frame.tab,
+                        unread = frame.unread,
+                        onSelect = onSelect,
+                        onReselect = onReselect,
+                    )
+                }
+            }
+        }
+        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+            BlockedNotice(BlockedNoticeState(frame.blockedVisible))
+        }
+        if (frame.aboutOpen) {
+            AboutSheet(
+                state = AboutState(
+                    versionName = BuildConfig.VERSION_NAME,
+                    versionCode = BuildConfig.VERSION_CODE,
+                ),
+                onDismiss = onDismissAbout,
+            )
         }
     }
 }

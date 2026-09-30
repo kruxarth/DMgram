@@ -1,0 +1,31 @@
+/* Phase 2 entry points and the DM reel lock. Instagram's own nav stays until Phase 3. */
+
+/* Q7: Reels tab. The anchor stays in the DOM. */
+a[href="/reels/"],
+a[href="/reels"] {
+  display: none !important;
+}
+
+/* Q8: Explore tab. Header search still clicks this anchor. */
+a[href="/explore/"],
+a[href="/explore"] {
+  display: none !important;
+}
+
+/* Q8: Explore grid on exactly /explore/. Search results live on /explore/search/. */
+html[data-dmgram-path="/explore/"] a[href*="/p/"],
+html[data-dmgram-path="/explore/"] a[href*="/reel/"],
+html[data-dmgram-path="/explore/"] :is(div, span):has(> a[href*="/p/"]),
+html[data-dmgram-path="/explore/"] :is(div, span):has(> a[href*="/reel/"]) {
+  display: none !important;
+}
+
+/* Q6: DM suggested-reel viewer. Keep the on-screen reel; hide the rest. */
+html[data-dmgram-reel-lock] [data-dmgram-reel-scroller] {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+html[data-dmgram-reel-lock] [data-dmgram-reel-extra] {
+  display: none !important;
+}

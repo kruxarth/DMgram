@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -37,6 +38,19 @@ android {
         compose = true
         buildConfig = true
     }
+
+}
+
+val copyDefaultRules = tasks.register<Copy>("copyDefaultRules") {
+    from(rootProject.file("rules/rules.json"))
+    into(layout.buildDirectory.dir("generated/dmgramAssets"))
+    rename { "rules.default.json" }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copyDefaultRules, Copy::getDestinationDirectory)
+    }
 }
 
 dependencies {
@@ -44,8 +58,14 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.webkit)
+    implementation(libs.androidx.browser)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.swiperefreshlayout)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
 }

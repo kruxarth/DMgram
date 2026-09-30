@@ -406,7 +406,7 @@ Add an `ACTION_VIEW` intent filter (no `autoVerify`) for `https://www.instagram.
 - DM → shared reel: the reel that was sent plays, swiping up shows no other reel, and Android back and the viewer's Back both return to the thread.
 - A friend's reel in the feed and a reel from a profile grid open as a single post page.
 - Hashtag in a caption: nothing navigates; the blocked notice shows.
-- `node tools/cdp.mjs eval "location.href='/reels/'"` and `"history.pushState({},'','/explore/')"` both end back where they were, with the notice.
+- `node tools/cdp.mjs eval "location.href='/reels/'"` and `"history.pushState({},'','/explore/tags/test/')"` both end back where they were, with the notice.
 - On a profile in the Home tab, tap "Message": the thread opens in the Home tab, and back returns to the profile.
 - `node tools/cdp.mjs eval "history.pushState({},'','/explore/search/keyword/?q=%23test')"` is blocked. Header search still reaches `/explore/search/` with no grid visible.
 - Bio link → Custom Tab. `adb shell am start -a android.intent.action.VIEW -d "https://www.instagram.com/p/<code>/"` opens the post in DMGram (after enabling the link in app settings).

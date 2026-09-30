@@ -212,13 +212,16 @@ class TabController(
                     slots.getValue(Tab.DMS).web?.loadUrl(decision.url)
                 }
             }
-            else -> when (decision.action) {
+            // MainActivity is exported: any app can send any URL here, so only Instagram routes load in a WebView.
+            else -> when (val action = decision.action) {
                 is NavAction.Block -> {
                     select(Tab.HOME)
                     showBlocked()
                 }
+                is NavAction.External -> openExternal(action.url)
+                is NavAction.System -> openSystem(action.url)
                 NavAction.Ignore -> Unit
-                else -> {
+                NavAction.Allow, is NavAction.Switch -> {
                     select(Tab.HOME)
                     slots.getValue(Tab.HOME).web?.loadUrl(decision.url)
                 }

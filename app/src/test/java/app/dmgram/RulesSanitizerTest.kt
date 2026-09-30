@@ -67,6 +67,13 @@ class RulesSanitizerTest {
     }
 
     @Test
+    fun rejectsUnknownRouteClassesSoTheyCannotCrashStartup() {
+        val text = """{"schema":1,"version":2,"routes":[{"class":"NOPE","pattern":"^/$"}]}"""
+        assertEquals("class", RulesSanitizer.rejection(text))
+        assertFalse(acceptedRemote(text, bundledVersion = 1, appVersionCode = 1))
+    }
+
+    @Test
     fun rejectsBadSelectorsPatternsAndSize() {
         assertEquals("selector", RulesSanitizer.rejection(rules(selector = "div{color:red}")))
         assertEquals("selector", RulesSanitizer.rejection(rules(selector = "a".repeat(501))))

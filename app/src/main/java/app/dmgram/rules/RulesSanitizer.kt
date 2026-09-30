@@ -1,5 +1,6 @@
 package app.dmgram.rules
 
+import app.dmgram.nav.RouteClass
 import app.dmgram.nav.Rules
 import app.dmgram.nav.isInstagramHost
 
@@ -34,6 +35,8 @@ object RulesSanitizer {
         }
         for (route in rules.routes) {
             if (route.pattern.length > 300 || !validRegex(route.pattern)) return "pattern"
+            // CompiledRules calls RouteClass.valueOf: an unknown class would crash every start while cached.
+            if (RouteClass.entries.none { it.name == route.kind }) return "class"
             if (route.hosts.any { !isInstagramHost(it.lowercase()) }) return "host"
         }
         return null

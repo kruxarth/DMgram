@@ -1,6 +1,6 @@
 # DMGram handoff
 
-Claude reads this instead of the codebase. Phases 0–5 are in. Do not start Phase 6 until this note is updated.
+Claude reads this instead of the codebase. Phases 0–5 are in. Phase 6 is wired locally and is not published.
 
 ## 1. Status
 
@@ -11,8 +11,8 @@ Claude reads this instead of the codebase. Phases 0–5 are in. Do not start Pha
 | 2 Navigation rules | done | Same rules in Kotlin and `router.js`. 81 fixtures. Reel lock is approach A. |
 | 3 Content cleanup | done | Home ends at "You're all caught up". Instagram chrome and nags are hidden, not removed. |
 | 4 Media and input | done | Photo picker, microphone permission, download listener, fullscreen hooks. |
-| 5 Rules, updates, About | done | Sanitizer, local rules server, update banner. No GitHub repo is configured. |
-| 6 Release | not started | Needs the user (keystore, repo). |
+| 5 Rules, updates, About | done | Sanitizer, local rules server, update banner. |
+| 6 Release | partial | Repo is `kruxarth/DMgram`. Signing, R8, and the tag workflow are in the tree. The user fills `keystore.properties` and the GitHub secrets. `v0.1.0` is not tagged. |
 
 `./gradlew test` and `node tools/test-router.mjs` pass (81 fixtures).
 
@@ -22,8 +22,8 @@ Claude reads this instead of the codebase. Phases 0–5 are in. Do not start Pha
 - `WebView.canGoBack()` ignores same-document history. Back uses `__dmgram.back()` / `go()`.
 - DM reel lock counts an on-screen, painted viewport video. Android back taps the top-most, then left-most, hit-testable icon, then Escape, then unlocks. The stacked "Suggested" viewer was not on screen.
 - The photo button's file input is overlaid, not reparented. Accept extensions go to the Photo Picker. Script `click()` does not open it.
-- Voice Clip's recorder trips the reel lock. Back still closes it. No HTML5 fullscreen control was found. A download was not triggered.
-- `dmgram.githubRepo` is empty, so remote rules and the update check are skipped and the log says so. Debug overrides are Gradle `-P` properties (`dmgram.rulesUrl`, `dmgram.updatesUrl`), not entries in `gradle.properties`. A debug override fetches on every start so a restarted local server can be seen inside the 6 h / 24 h windows. Release builds ignore those URLs.
+- Voice Clip's recorder can still arm the reel lock if its video has a `currentSrc`. A video with an empty `currentSrc` is ignored. The recorder was not opened again after that check. Back still closes it. No HTML5 fullscreen control was found. A download was not triggered.
+- `dmgram.githubRepo` is `kruxarth/DMgram`. Debug overrides are still Gradle `-P` properties (`dmgram.rulesUrl`, `dmgram.updatesUrl`), not entries in `gradle.properties`. A debug override fetches on every start so a restarted local server can be seen inside the 6 h / 24 h windows. Release builds ignore those URLs. Without `keystore.properties`, `assembleRelease` is unsigned. GitHub secrets are `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`. `storeFile` has to be an absolute path.
 - Cleartext is allowed only in debug, and only for `localhost` and `127.0.0.1`.
 - Remote rules are the original JSON string (markers stay). Kotlin parses `schema`, `version`, `minAppVersionCode`, `hide`, and `css` for the checks.
 - `polish.css` and `polish.js` are empty. Do not write them.
@@ -71,7 +71,8 @@ Reinstall without those properties afterward. Debug id is `app.dmgram.debug`.
 - Logged-out nags, the eight-video Suggested viewer, a feed reel, HTML5 fullscreen, and a real download were not exercised.
 - Both WebViews share one renderer. An incoming VIEW without a component opens the official Instagram app.
 - A main-frame load error was not provoked on the phone. The overlay is in place.
-- Phase 6 needs a keystore and a GitHub repo before updates and rules can come from the network in a release build.
+- Home cleanup batches on a fast fling peaked at 1.9 ms (the earlier peak was 7.1 ms). The scan does not use a document-wide `querySelectorAll` per frame, and it stops classifying once the caught-up cutoff is applied.
+- A signed release has not been installed over another signed release. Debug stays `app.dmgram.debug`, so a release APK would be a separate install.
 
 ## 7. What the UX layer must know
 

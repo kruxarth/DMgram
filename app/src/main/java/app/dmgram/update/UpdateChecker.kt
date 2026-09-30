@@ -32,7 +32,8 @@ class UpdateChecker(
 
     fun saved(): UpdateInfo? {
         val version = prefs.getString(KEY_VERSION, null)?.takeIf { it.isNotBlank() } ?: return null
-        val apk = prefs.getString(KEY_APK, null)?.takeIf { it.isNotBlank() } ?: return null
+        val apk = prefs.getString(KEY_APK, null)
+            ?.takeIf { UpdateDecision.trustedApk(it, BuildConfig.GITHUB_REPO) } ?: return null
         val page = prefs.getString(KEY_PAGE, null).orEmpty()
         return UpdateInfo(version, apk, page)
     }
@@ -66,7 +67,7 @@ class UpdateChecker(
                     return@withContext null
                 }
                 prefs.edit().putLong(KEY_FETCHED, now()).apply()
-                UpdateDecision.parse(body, currentVersion)
+                UpdateDecision.parse(body, currentVersion, BuildConfig.GITHUB_REPO)
             }
         } catch (error: IOException) {
             if (!coroutineContext.isActive) return@withContext null

@@ -11,19 +11,30 @@ import org.junit.Test
 class UpdateDecisionTest {
     @Test
     fun newerReleaseExposesTheApk() {
-        val info = UpdateDecision.parse(release("v9.9.9"), "0.1.0")
+        val info = UpdateDecision.parse(release("v9.9.9"), "0.1.0", REPO)
         assertEquals("9.9.9", info?.version)
-        assertEquals("https://example.com/DMGram-v9.9.9.apk", info?.apkUrl)
+        assertEquals(APK, info?.apkUrl)
         assertEquals("https://example.com/release", info?.releaseUrl)
     }
 
     @Test
     fun olderOrEqualOrApkLessIsIgnored() {
-        assertNull(UpdateDecision.parse(release("v0.0.1"), "0.1.0"))
-        assertNull(UpdateDecision.parse(release("v0.1.0"), "0.1.0"))
-        assertNull(UpdateDecision.parse(release("v9.9.9", apk = null), "0.1.0"))
-        assertNull(UpdateDecision.parse("not json", "0.1.0"))
-        assertNull(UpdateDecision.parse(release("latest"), "0.1.0"))
+        assertNull(UpdateDecision.parse(release("v0.0.1"), "0.1.0", REPO))
+        assertNull(UpdateDecision.parse(release("v0.1.0"), "0.1.0", REPO))
+        assertNull(UpdateDecision.parse(release("v9.9.9", apk = null), "0.1.0", REPO))
+        assertNull(UpdateDecision.parse("not json", "0.1.0", REPO))
+        assertNull(UpdateDecision.parse(release("latest"), "0.1.0", REPO))
+    }
+
+    @Test
+    fun apkMustBeAReleaseAssetOfThisRepo() {
+        assertNull(UpdateDecision.parse(release("v9.9.9", apk = "https://evil.example/DMGram.apk"), "0.1.0", REPO))
+        assertNull(UpdateDecision.parse(release("v9.9.9", apk = "https://github.com/other/repo/releases/download/v9.9.9/DMGram.apk"), "0.1.0", REPO))
+        assertNull(UpdateDecision.parse(release("v9.9.9", apk = "http://github.com/$REPO/releases/download/v9.9.9/DMGram.apk"), "0.1.0", REPO))
+        assertNull(UpdateDecision.parse(release("v9.9.9", apk = "https://github.com/$REPO/releases/download/../../../evil/x.apk"), "0.1.0", REPO))
+        assertNull(UpdateDecision.parse(release("v9.9.9"), "0.1.0", ""))
+        assertFalse(UpdateDecision.trustedApk("https://github.com/$REPO/releases/download/v1/x.apk?u=https://evil", REPO))
+        assertTrue(UpdateDecision.trustedApk(APK, REPO))
     }
 
     @Test
@@ -38,8 +49,13 @@ class UpdateDecisionTest {
         assertTrue(url.startsWith("https://github.com/example/dmgram/issues/new?body="))
     }
 
-    private fun release(tag: String, apk: String? = "https://example.com/DMGram-v9.9.9.apk"): String {
+    private fun release(tag: String, apk: String? = APK): String {
         val assets = if (apk == null) "[]" else """[{"name":"DMGram.apk","browser_download_url":"$apk"}]"""
         return """{"tag_name":"$tag","html_url":"https://example.com/release","assets":$assets}"""
+    }
+
+    private companion object {
+        const val REPO = "example/dmgram"
+        const val APK = "https://github.com/example/dmgram/releases/download/v9.9.9/DMGram-v9.9.9.apk"
     }
 }

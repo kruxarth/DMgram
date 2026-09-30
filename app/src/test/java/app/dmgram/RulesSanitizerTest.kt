@@ -51,6 +51,19 @@ class RulesSanitizerTest {
         assertEquals("css", RulesSanitizer.rejection(rules(css = "a{xss:expression(alert(1))}")))
         assertEquals("css", RulesSanitizer.rejection(rules(css = "a{-moz-binding:url(x)}")))
         assertEquals("css", RulesSanitizer.rejection(rules(css = "a{behavior:url(x)}")))
+        assertEquals("css", RulesSanitizer.rejection(rules(css = "a{background:src(\"https://evil\")}")))
+        assertEquals("css", RulesSanitizer.rejection(rules(css = "a{background:-webkit-image-set(\"https://evil\" 1x)}")))
+        assertEquals("css", RulesSanitizer.rejection(rules(css = "a{background:URL(https://evil)}")))
+    }
+
+    @Test
+    fun selectorsCannotSmuggleCss() {
+        // Selectors are joined into CSS text ahead of `css`, so this was a working remote @import.
+        assertEquals("selector", RulesSanitizer.rejection(rules(selector = "@import url(https://evil/x.css);a")))
+        assertEquals("selector", RulesSanitizer.rejection(rules(selector = "@import 'https://evil/x.css';a")))
+        assertEquals("selector", RulesSanitizer.rejection(rules(selector = "a[href^=x]::after;b")))
+        assertEquals("selector", RulesSanitizer.rejection(rules(selector = "a\\7b")))
+        assertNull(RulesSanitizer.rejection(rules(selector = "div[role='dialog'] > a[href^='/explore/']")))
     }
 
     @Test

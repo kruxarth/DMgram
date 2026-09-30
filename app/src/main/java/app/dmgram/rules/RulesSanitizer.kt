@@ -11,6 +11,7 @@ object RulesSanitizer {
         "@import",
         "image-set(",
         "@font-face",
+        "src(",
         "expression(",
         "-moz-binding",
         "behavior:",
@@ -27,7 +28,9 @@ object RulesSanitizer {
         if (cssRejected(rules.css)) return "css"
         for (rule in rules.hide) {
             val selector = rule.selector
-            if (selector.length > 500 || selector.contains('{') || selector.contains('}')) return "selector"
+            // cleanup.js writes `selector{display:none!important}` into a style sheet, so a selector is CSS too:
+            // `@import url(…);a` would otherwise load a remote sheet ahead of every other rule.
+            if (selector.length > 500 || selector.any { it in "{};@" } || cssRejected(selector)) return "selector"
         }
         for (route in rules.routes) {
             if (route.pattern.length > 300 || !validRegex(route.pattern)) return "pattern"

@@ -98,6 +98,11 @@ fun classify(raw: String, rules: CompiledRules): Classified {
         return Classified(RouteClass.EXTERNAL, trimmed, scheme.ifEmpty { "unknown" })
     }
     val unwrapped = unwrap(uri)
+    // The shim's target is web-supplied: it gets the same scheme check as a direct link.
+    val innerScheme = unwrapped.scheme?.lowercase().orEmpty()
+    if (innerScheme != "http" && innerScheme != "https") {
+        return Classified(RouteClass.EXTERNAL, unwrapped.toString(), innerScheme.ifEmpty { "unknown" })
+    }
     val host = unwrapped.host?.lowercase().orEmpty()
     if (host == "l.instagram.com") {
         return Classified(RouteClass.EXTERNAL, unwrapped.toString(), "https")

@@ -79,5 +79,19 @@
   {"tab": "HOME", "url": "mailto:a@b.com", "expectedClass": "EXTERNAL", "expectedAction": "SYSTEM"},
   {"tab": "HOME", "url": "tel:+15551212", "expectedClass": "EXTERNAL", "expectedAction": "SYSTEM"},
   {"tab": "HOME", "url": "intent://user/#Intent;scheme=instagram;end", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
-  {"tab": "HOME", "url": "instagram://user?username=example_user", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"}
+  {"tab": "HOME", "url": "instagram://user?username=example_user", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
+  {"tab": "HOME", "url": "https://l.instagram.com/?u=javascript%3Aalert(1)", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
+  {"tab": "HOME", "url": "https://l.instagram.com/?u=intent%3A%2F%2Fx%23Intent%3Bend", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
+  {"tab": "HOME", "url": "https://l.instagram.com/?u=content%3A%2F%2Fx", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
+  {"tab": "HOME", "url": "https://l.instagram.com/?u=file%3A%2F%2F%2Fetc%2Fhosts", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
+  {"tab": "HOME", "url": "https://www.instagram.com@evil.com/", "expectedClass": "EXTERNAL", "expectedAction": "EXTERNAL"},
+  {"tab": "HOME", "url": "https://www.instagram.com%2F@evil.com/", "expectedClass": "EXTERNAL", "expectedAction": "EXTERNAL"},
+  {"tab": "HOME", "url": "https://www.instagram.com.evil.com/", "expectedClass": "EXTERNAL", "expectedAction": "EXTERNAL"},
+  {"tab": "HOME", "url": "https://www.instagram.com./", "expectedClass": "EXTERNAL", "expectedAction": "EXTERNAL"},
+  {"tab": "HOME", "url": "https://www.xn--nstagram-shh.com/", "expectedClass": "EXTERNAL", "expectedAction": "EXTERNAL"},
+  {"tab": "HOME", "url": "https://evil.com#.instagram.com", "expectedClass": "EXTERNAL", "expectedAction": "EXTERNAL"},
+  {"tab": "HOME", "url": "data:text/html,hi", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
+  {"tab": "HOME", "url": "blob:https://www.instagram.com/x", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
+  {"tab": "HOME", "url": "intent://x#Intent;scheme=https;end", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"},
+  {"tab": "HOME", "url": "instagram://user?username=x", "expectedClass": "EXTERNAL", "expectedAction": "IGNORE"}
 ]

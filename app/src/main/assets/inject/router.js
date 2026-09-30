@@ -41,6 +41,11 @@
       return { class: "EXTERNAL", url: parsed.toString(), scheme: scheme || "unknown" };
     }
     const target = unwrap(parsed);
+    // The shim's target is web-supplied: it gets the same scheme check as a direct link.
+    const innerScheme = (target.protocol || "").replace(":", "").toLowerCase();
+    if (innerScheme !== "http" && innerScheme !== "https") {
+      return { class: "EXTERNAL", url: target.toString(), scheme: innerScheme || "unknown" };
+    }
     const host = target.hostname.toLowerCase();
     if (host === "l.instagram.com") {
       return { class: "EXTERNAL", url: target.toString(), scheme: "https" };

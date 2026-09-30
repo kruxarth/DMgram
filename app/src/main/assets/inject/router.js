@@ -163,6 +163,7 @@
     let reelObserver = null;
     let reelCheckScheduled = false;
     let reelScroller = null;
+    let reelHost = null;
     let reelTouch = null;
 
     function blockGesture(event) {
@@ -170,9 +171,27 @@
       event.preventDefault();
     }
 
+    function painted(node) {
+      let el = node;
+      while (el && el.nodeType === 1) {
+        const style = getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        const opacity = parseFloat(style.opacity);
+        if (!Number.isNaN(opacity) && opacity === 0) return false;
+        el = el.parentElement;
+      }
+      return true;
+    }
+
+    function intersectsViewport(rect) {
+      return rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth;
+    }
+
     function unlockReel() {
       const html = document.documentElement;
       if (html) html.removeAttribute("data-dmgram-reel-lock");
+      if (reelHost) reelHost.removeAttribute("data-dmgram-reel-host");
+      reelHost = null;
       if (reelScroller) {
         reelScroller.removeAttribute("data-dmgram-reel-scroller");
         reelScroller.querySelectorAll("[data-dmgram-reel-extra]").forEach((node) => {
@@ -215,10 +234,15 @@
       }
       scroller.setAttribute("data-dmgram-reel-scroller", "");
       reelScroller = scroller;
-      armLock();
+      armLock(viewerHost((keep.querySelector("video") || items[0].querySelector("video") || scroller)));
     }
 
-    function armLock() {
+    function armLock(host) {
+      if (host && host !== document.documentElement && host !== document.body) {
+        if (reelHost && reelHost !== host) reelHost.removeAttribute("data-dmgram-reel-host");
+        host.setAttribute("data-dmgram-reel-host", "");
+        reelHost = host;
+      }
       document.documentElement.setAttribute("data-dmgram-reel-lock", "");
       if (!reelTouch) {
         reelTouch = blockGesture;
@@ -234,8 +258,37 @@
     function viewportVideos() {
       return [...document.querySelectorAll("video")].filter((video) => {
         const rect = video.getBoundingClientRect();
-        return rect.width > window.innerWidth * 0.8 && rect.height > window.innerHeight * 0.7;
+        if (rect.width <= window.innerWidth * 0.8 || rect.height <= window.innerHeight * 0.7) return false;
+        if (!intersectsViewport(rect)) return false;
+        return painted(video);
       });
+    }
+
+    function viewerHost(video) {
+      let el = video.parentElement;
+      let host = null;
+      while (el && el !== document.body && el !== document.documentElement) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > window.innerWidth * 0.8 && rect.height > window.innerHeight * 0.7) host = el;
+        el = el.parentElement;
+      }
+      return host;
+    }
+
+    function threadComposerVisible(host) {
+      const boxes = document.querySelectorAll("[role='textbox'], textarea, [contenteditable='true']");
+      for (const box of boxes) {
+        if (host && host.contains(box)) continue;
+        const rect = box.getBoundingClientRect();
+        if (rect.width < 40 || rect.height < 8) continue;
+        if (!intersectsViewport(rect) || !painted(box)) continue;
+        const style = getComputedStyle(box);
+        if (style.pointerEvents === "none" || style.visibility === "hidden") continue;
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, Math.min(rect.top + rect.height / 2, window.innerHeight - 1));
+        if (!hit || (!box.contains(hit) && !hit.contains(box))) continue;
+        return true;
+      }
+      return false;
     }
 
     function detectReel() {
@@ -244,7 +297,8 @@
         return;
       }
       const videos = viewportVideos();
-      if (videos.length < 1) {
+      const host = videos[0] ? viewerHost(videos[0]) : null;
+      if (videos.length < 1 || threadComposerVisible(host)) {
         unlockReel();
         return;
       }
@@ -261,7 +315,7 @@
         lockReel(scroller);
         return;
       }
-      armLock();
+      armLock(host);
     }
 
     function scheduleReel() {
@@ -286,85 +340,56 @@
       }
     }
 
+    function pointOf(rect) {
+      return (rect.left + rect.width / 2) + "," + (rect.top + rect.height / 2) + "," + window.innerWidth;
+    }
+
     function reelBackPoint() {
-      const video = [...document.querySelectorAll("video")].find((item) => {
-        const rect = item.getBoundingClientRect();
-        return rect.width > window.innerWidth * 0.8 && rect.height > window.innerHeight * 0.7;
-      });
-      if (!video) return "";
-      const close = [...document.querySelectorAll('svg[aria-label="Close"]')].find((svg) => {
-        const rect = svg.getBoundingClientRect();
-        return rect.width >= 8 && rect.top >= 0 && rect.top < 160;
-      });
-      if (close) {
-        const rect = close.getBoundingClientRect();
-        return (rect.left + rect.width / 2) + "," + (rect.top + rect.height / 2) + "," + window.innerWidth;
-      }
-      const svgs = [...document.querySelectorAll('svg[aria-label="Back"]')];
+      const videos = viewportVideos();
+      if (!videos.length) return "";
+      const host = viewerHost(videos[0]) || document.documentElement;
+      const icons = [...host.querySelectorAll("button svg, [role='button'] svg, a svg")];
       let best = null;
-      let bestDepth = 99;
-      for (const svg of svgs) {
+      let bestTop = Infinity;
+      let bestLeft = Infinity;
+      let bestLabel = 0;
+      for (const svg of icons) {
         const rect = svg.getBoundingClientRect();
-        if (rect.width < 8 || rect.top < 0 || rect.top > 180) continue;
-        let el = svg.parentElement;
-        let depth = 0;
-        while (el && el !== document.body && el !== document.documentElement && depth < 16) {
-          if (el.contains(video)) {
-            if (depth < bestDepth) {
-              bestDepth = depth;
-              best = rect;
-            }
-            break;
-          }
-          el = el.parentElement;
-          depth += 1;
-        }
+        if (rect.width < 8 || rect.height < 8 || rect.top < 0 || rect.top > 160) continue;
+        if (!intersectsViewport(rect) || !painted(svg)) continue;
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const hit = document.elementFromPoint(cx, cy);
+        if (!hit || (!svg.contains(hit) && !hit.contains(svg))) continue;
+        const label = (svg.getAttribute("aria-label") || "").toLowerCase();
+        const labelScore = label === "close" || label === "back" ? 1 : 0;
+        const nearerTop = rect.top < bestTop - 1;
+        const sameTop = Math.abs(rect.top - bestTop) <= 1;
+        const nearerLeft = rect.left < bestLeft - 1;
+        const sameLeft = Math.abs(rect.left - bestLeft) <= 1;
+        if (best && !nearerTop && !(sameTop && nearerLeft) && !(sameTop && sameLeft && labelScore > bestLabel)) continue;
+        best = rect;
+        bestTop = rect.top;
+        bestLeft = rect.left;
+        bestLabel = labelScore;
       }
-      if (!best && svgs.length === 1) {
-        const rect = svgs[0].getBoundingClientRect();
-        if (rect.width >= 8 && rect.top >= 0 && rect.top < 180) best = rect;
-      }
-      if (!best) return "";
-      return (best.left + best.width / 2) + "," + (best.top + best.height / 2) + "," + window.innerWidth;
+      return best ? pointOf(best) : "";
+    }
+
+    function reelEscape() {
+      document.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Escape",
+        code: "Escape",
+        keyCode: 27,
+        which: 27,
+        bubbles: true,
+        cancelable: true,
+      }));
     }
 
     dmgram.reelBackPoint = reelBackPoint;
-
-    dmgram.closeReelViewer = function () {
-      const video = [...document.querySelectorAll("video")].find((item) => {
-        const rect = item.getBoundingClientRect();
-        return rect.width > window.innerWidth * 0.8 && rect.height > window.innerHeight * 0.7;
-      });
-      if (!video) return;
-      const svgs = [...document.querySelectorAll('svg[aria-label="Back"]')];
-      let svg = null;
-      let best = Infinity;
-      for (const candidate of svgs) {
-        const rect = candidate.getBoundingClientRect();
-        if (rect.width < 8 || rect.top < 0 || rect.top > 160) continue;
-        let el = candidate.parentElement;
-        let host = null;
-        for (let i = 0; i < 8 && el && el !== document.body && el !== document.documentElement; i++) {
-          if (el.contains(video)) {
-            const hostRect = el.getBoundingClientRect();
-            if (hostRect.width > window.innerWidth * 0.8 && hostRect.height > window.innerHeight * 0.7) {
-              host = el;
-              break;
-            }
-          }
-          el = el.parentElement;
-        }
-        if (!host || rect.top >= best) continue;
-        best = rect.top;
-        svg = candidate;
-      }
-      if (!svg) {
-        if (window.__dmgramLog) window.__dmgramLog("info", "reel back not found");
-        return;
-      }
-      const target = svg.closest("button, [role='button'], a") || svg.parentElement;
-      if (target) target.click();
-    };
+    dmgram.reelEscape = reelEscape;
+    dmgram.forceUnlock = unlockReel;
 
     reportRoute();
   }

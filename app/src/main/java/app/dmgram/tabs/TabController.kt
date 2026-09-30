@@ -152,9 +152,13 @@ class TabController(
         }
         if (slot.reelLocked) {
             val web = slot.web
-            if (web != null) tapReelBack(web)
+            if (web != null) dismissReel(web, slot) else continueBack(slot)
             return
         }
+        continueBack(slot)
+    }
+
+    private fun continueBack(slot: Slot) {
         val web = slot.web
         if (web != null && stepBack(web, slot)) return
         if (current != Tab.HOME) {
@@ -399,7 +403,10 @@ class TabController(
                 if (slot.tab == Tab.HOME) homeUnread = event.count.coerceAtLeast(0)
             }
             is BridgeEvent.Username -> onUsername(event.value)
-            is BridgeEvent.Theme -> if (slot.tab == current) pageDark = event.dark
+            is BridgeEvent.Theme -> {
+                if (slot.tab == current) pageDark = event.dark
+                slot.web?.setBackgroundColor(cssColor(event.background, event.dark))
+            }
             is BridgeEvent.Scroll -> slot.atTop = event.atTop
             BridgeEvent.Ready -> {
                 slot.ready = true
@@ -416,30 +423,50 @@ class TabController(
         publish()
     }
 
-    private fun tapReelBack(web: WebView) {
+    private fun dismissReel(web: WebView, slot: Slot) {
         web.evaluateJavascript(
             "(window.__dmgram&&window.__dmgram.reelBackPoint&&window.__dmgram.reelBackPoint())||''",
         ) { raw ->
-            val text = raw?.trim()?.removeSurrounding("\"") ?: return@evaluateJavascript
-            val parts = text.split(',')
-            if (parts.size < 3) return@evaluateJavascript
-            val cssX = parts[0].toFloatOrNull() ?: return@evaluateJavascript
-            val cssY = parts[1].toFloatOrNull() ?: return@evaluateJavascript
-            val inner = parts[2].toFloatOrNull() ?: return@evaluateJavascript
-            if (inner <= 1f || web.width <= 0) return@evaluateJavascript
-            val scale = web.width / inner
-            val x = cssX * scale
-            val y = cssY * scale
-            val downTime = SystemClock.uptimeMillis()
-            val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
-            web.dispatchTouchEvent(down)
+            if (tapAt(web, raw)) return@evaluateJavascript
+            web.evaluateJavascript(
+                "(window.__dmgram&&window.__dmgram.reelEscape&&window.__dmgram.reelEscape())||''",
+                null,
+            )
             web.postDelayed({
-                val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, x, y, 0)
-                web.dispatchTouchEvent(up)
-                down.recycle()
-                up.recycle()
-            }, 60)
+                if (!slot.reelLocked) return@postDelayed
+                Log.i(DMGramApp.TAG, "Reel back fell through on ${slot.tab.name}")
+                web.evaluateJavascript(
+                    "(window.__dmgram&&window.__dmgram.forceUnlock&&window.__dmgram.forceUnlock())||''",
+                    null,
+                )
+                slot.reelLocked = false
+                publish()
+                continueBack(slot)
+            }, 300)
         }
+    }
+
+    private fun tapAt(web: WebView, raw: String?): Boolean {
+        val text = raw?.trim()?.removeSurrounding("\"") ?: return false
+        val parts = text.split(',')
+        if (parts.size < 3) return false
+        val cssX = parts[0].toFloatOrNull() ?: return false
+        val cssY = parts[1].toFloatOrNull() ?: return false
+        val inner = parts[2].toFloatOrNull() ?: return false
+        if (inner <= 1f || web.width <= 0) return false
+        val scale = web.width / inner
+        val x = cssX * scale
+        val y = cssY * scale
+        val downTime = SystemClock.uptimeMillis()
+        val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
+        web.dispatchTouchEvent(down)
+        web.postDelayed({
+            val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, x, y, 0)
+            web.dispatchTouchEvent(up)
+            down.recycle()
+            up.recycle()
+        }, 60)
+        return true
     }
 
     private fun stepBack(web: WebView, slot: Slot): Boolean {
@@ -558,7 +585,7 @@ class TabController(
 
     private fun onTitle(slot: Slot, title: String?) {
         if (slot.tab != Tab.DMS) return
-        val count = title?.let { titlePattern.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+        val count = title?.let { titlePattern.find(it)?.groupValues?.get(1)?.toIntOrNull() } ?: return
         titleUnread = count
         publish()
     }
@@ -701,6 +728,22 @@ class TabController(
     } catch (error: java.io.IOException) {
         Log.e(DMGramApp.TAG, "Bundled rules are missing", error)
         """{"routes":[],"reserved":[]}"""
+    }
+
+    private fun cssColor(value: String, dark: Boolean): Int {
+        val rgb = Regex("""rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)""").find(value)
+        if (rgb != null) {
+            return android.graphics.Color.rgb(
+                rgb.groupValues[1].toInt().coerceIn(0, 255),
+                rgb.groupValues[2].toInt().coerceIn(0, 255),
+                rgb.groupValues[3].toInt().coerceIn(0, 255),
+            )
+        }
+        return try {
+            android.graphics.Color.parseColor(value)
+        } catch (error: IllegalArgumentException) {
+            windowBackground(dark)
+        }
     }
 
     private fun isDark(): Boolean {

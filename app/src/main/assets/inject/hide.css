@@ -1,4 +1,25 @@
-/* Phase 2 entry points and the DM reel lock. Instagram's own nav stays until Phase 3. */
+/* Functional hiding. Anchors stay in the DOM so navigate() and the unread badge still work. */
+
+/* Q18 Instagram home header. The element is header, so page shells are not matched. */
+header:has(a[href="/notifications/"]) {
+  display: none !important;
+}
+
+/* Q18 Instagram bottom nav. cleanup.js marks the short bar that holds the tab anchors. */
+[data-dmgram-chrome="nav"] {
+  display: none !important;
+}
+
+/* Q13 and logged-out nags. cleanup.js sets the attribute; this rule does the hiding. */
+[data-dmgram-hidden] {
+  display: none !important;
+}
+
+/* Q9 similar-accounts control on a profile. */
+button:has(svg[aria-label="Similar accounts"]),
+[role="button"]:has(svg[aria-label="Similar accounts"]) {
+  display: none !important;
+}
 
 /* Q7: Reels tab. The anchor stays in the DOM. */
 a[href="/reels/"],
@@ -21,9 +42,11 @@ html[data-dmgram-path="/explore/"] :is(div, span):has(> a[href*="/reel/"]) {
 }
 
 /* Q6: DM suggested-reel viewer. Keep the on-screen reel; hide the rest. */
-html[data-dmgram-reel-lock] [data-dmgram-reel-scroller] {
+html[data-dmgram-reel-lock] [data-dmgram-reel-scroller],
+html[data-dmgram-reel-lock] [data-dmgram-reel-host] {
   overflow: hidden !important;
   overscroll-behavior: none !important;
+  touch-action: none !important;
 }
 
 html[data-dmgram-reel-lock] [data-dmgram-reel-extra] {

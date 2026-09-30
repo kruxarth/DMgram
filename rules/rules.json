@@ -1,6 +1,55 @@
 {
   "schema": 1,
   "version": 1,
+  "minAppVersionCode": 1,
+  "hide": [],
+  "css": "",
+  "markers": {
+    "sponsored": {
+      "en": ["Sponsored", "Ad"],
+      "es": ["Patrocinado", "Anuncio"],
+      "pt": ["Patrocinado", "Anúncio"],
+      "fr": ["Sponsorisé"],
+      "de": ["Gesponsert", "Anzeige"],
+      "id": ["Bersponsor", "Iklan"],
+      "hi": ["प्रायोजित"]
+    },
+    "suggested": {
+      "en": ["Suggested for you", "Suggested posts", "Suggested Posts", "Suggested reels"],
+      "es": ["Sugerencias para ti", "Publicaciones sugeridas"],
+      "pt": ["Sugestões para você", "Publicações sugeridas"],
+      "fr": ["Suggestions pour vous"],
+      "de": ["Vorschläge für dich"],
+      "id": ["Saran untuk Anda"],
+      "hi": ["आपके लिए सुझाव"]
+    },
+    "caughtUp": {
+      "en": ["You're all caught up"],
+      "es": ["Ya estás al día"],
+      "pt": ["Você está em dia"],
+      "fr": ["Vous êtes à jour"],
+      "de": ["Du bist auf dem neuesten Stand"]
+    },
+    "nags": {
+      "en": ["Use the app", "Open app", "Open Instagram"],
+      "es": ["Usar la aplicación", "Abrir Instagram"],
+      "pt": ["Usar o app", "Abrir o Instagram"],
+      "fr": ["Utiliser l'application", "Ouvrir Instagram"],
+      "de": ["App verwenden", "Instagram öffnen"]
+    },
+    "follow": {
+      "en": ["Follow"],
+      "es": ["Seguir"],
+      "pt": ["Seguir"],
+      "fr": ["Suivre"],
+      "de": ["Folgen"],
+      "id": ["Ikuti"],
+      "hi": ["फ़ॉलो करें"]
+    },
+    "similar": {
+      "en": ["Similar accounts"]
+    }
+  },
   "reserved": [
     "p",
     "reel",

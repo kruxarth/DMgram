@@ -155,6 +155,7 @@ function setConfig(json) {
     window.__dmgram.tab = next.tab;
   }
   if (typeof next.debug === "boolean") CONFIG.debug = next.debug;
+  if (window.__dmgramApplyRules) window.__dmgramApplyRules();
 }
 
 function setSystemDark(dark) {
@@ -256,14 +257,26 @@ function publishUnread() {
 
 let readyKey = "";
 function publishReady() {
-  const key = location.pathname + location.search;
+  const route = (window.__dmgram && window.__dmgram.route) || "";
+  const key = route + location.pathname + location.search;
   if (readyKey === key) return;
   const text = (document.body && document.body.innerText) || "";
-  const ready = !!document.querySelector("article")
-    || !!document.querySelector('[aria-label^="Story by "]')
-    || /your story/i.test(text)
-    || (location.pathname.indexOf("/direct/") === 0 && text.length > 80)
-    || /log in/i.test(text);
+  let ready = false;
+  if (route === "HOME_FEED") {
+    ready = !!document.querySelector("article, [aria-label^='Story by '], [aria-label*='Your story' i]");
+  } else if (route === "DIRECT_INBOX" || route === "DIRECT_THREAD") {
+    ready = !!document.querySelector("[role='textbox'], textarea") || text.length > 40;
+  } else if (route === "PROFILE") {
+    ready = !!document.querySelector("header, article, img");
+  } else if (route === "SEARCH") {
+    ready = !!document.querySelector("input, [role='search']");
+  } else if (route === "AUTH") {
+    ready = /log in/i.test(text) || !!document.querySelector("input");
+  } else if (route === "STORY" || route === "REEL_SINGLE" || route === "POST") {
+    ready = !!document.querySelector("video, article, img");
+  } else if (route) {
+    ready = text.length > 40 || !!document.querySelector("article, input, video");
+  }
   if (!ready) return;
   readyKey = key;
   window.__dmgramPost({ type: "ready" });

@@ -305,3 +305,23 @@ These were checked in the debug app after the frame and the rules existed. Chrom
 **External link.** A Threads profile link (`https://www.threads.com/@…`) opened a Firefox Custom Tab.
 
 **Reel dismiss.** The viewer chevron is `svg[aria-label="Close"]`, not Back. `element.click()` does not dismiss it. A real tap does, and the thread stays on `/direct/t/…`. Android back sends that tap. The thread's own control remains `svg[aria-label="Back"]`.
+
+## Review 1 and Phase 3 (30 Sep 2026)
+
+**Live DMs.** The user confirmed a new message appears without a refresh.
+
+**Reel back (T1–T2).** With every `aria-label` removed inside the viewer host, `reelBackPoint()` still returned the close control (about CSS 28,45), because it is the top-most hit-testable icon in the top 160px. The thread's Back icon is higher but covered, so `elementFromPoint` rejects it. Android back closed the viewer onto `/direct/t/1000000000000001/`. Five open/close cycles each left the lock off. A finger swipe then moved a message from y=140 to y=448. The next back left the thread for `/`.
+
+**Stacked Suggested viewer (T3).** Not seen. The opened viewer had one viewport-tall video, two 0×0 videos, one `data-dmgram-reel-extra`, and no "Suggested" text. `touch-action` on the scroller and the host was `none`. A swipe did not change the video. The user had already confirmed that scrolling a sent reel does nothing and back returns to the chat.
+
+**Follow button.** On `/`, articles with a header button whose text is exactly `Follow` were suggestions (also labeled "Suggested for you" or an ad). Followed posts (`friend_a`, `friend_b`) had no Follow button and stayed visible. "Followed by …" is not the Follow label. No "Follow back" post showed up, so that case is unproven. Text markers remain the backup.
+
+**Caught up.** The feed ends on the "You're all caught up" checkmark. "Suggested Posts" after it is hidden. Hiding the marker's parent was a bug (a "Suggested" label walked up into the end card); the parent stays, and only later siblings are hidden. A node that contains more than one `article`, or both the Reels tab link and an article, is not hidden, so the page shell stays.
+
+**Pagination.** After the cutoff, 60 seconds at the bottom: zero `XMLHttpRequest` opens to `/graphql/query`. Nothing extra was done to stop pagination. Network response patching was not added.
+
+**Chrome.** Instagram's `<header>` that links to `/notifications/` is `display: none`. The bottom bar is marked `data-dmgram-chrome="nav"` (a CSS `:has()` on the links also matches ancestors) and hidden. "Use the app" is hidden. Search shows the field and recents, no grid. Profile opens `/example_user/`. On `/friend_a/` the similar-accounts control is `display: none`. Logged-out nags were not reopened.
+
+**Theme.** `cmd uimode night yes` set `__fb-dark-mode`, `color-scheme: dark`, background `rgb(12, 16, 20)`, with `matchMedia('(prefers-color-scheme: dark)')` true. Documents were not reloaded. Instagram's own appearance switch was not touched, so a disagreement with the system was not created. `night no` restored `__fb-light-mode` and white. The phone was left on light.
+
+**Cleanup cost.** Debug log: observer callbacks did not exceed 2ms. The animation-frame scan averaged 2.2ms and one batch was 7.1ms.

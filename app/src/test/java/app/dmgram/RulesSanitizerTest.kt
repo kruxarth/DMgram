@@ -16,8 +16,8 @@ class RulesSanitizerTest {
         val text = repoFile("rules/rules.json").readText()
         val rules = Rules.parse(text)
         assertEquals(1, rules.schema)
-        assertEquals(1, rules.version)
-        assertTrue(rules.hide.isEmpty())
+        assertTrue(rules.version >= 1)
+        for (rule in rules.hide) assertTrue(rule.selector.isNotBlank())
         assertNull(RulesSanitizer.rejection(text))
     }
 

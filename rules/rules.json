@@ -1,8 +1,10 @@
 {
   "schema": 1,
-  "version": 1,
+  "version": 2,
   "minAppVersionCode": 1,
-  "hide": [],
+  "hide": [
+    { "id": "profile-reposts-tab", "selector": "a[href$=\"/reposts/\"], a[href$=\"/reposts\"]", "note": "Instagram's website shows an empty Reposts tab on profiles; reposts are app-only. Delete this rule (and bump version) once instagram.com shows reposts." }
+  ],
   "css": "",
   "markers": {
     "sponsored": {

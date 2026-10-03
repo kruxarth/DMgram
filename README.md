@@ -147,6 +147,10 @@ The APK lands in `app/build/outputs/apk/debug/`. Release builds are made and sig
 
 Found something that shows up when it shouldn't, or broke after an Instagram change? Open an issue, or use **Report a problem** in the app's About screen (tap the DMGram title on Home). It fills in your app, Android and WebView versions, and nothing else.
 
+## License
+
+DMGram is free software, licensed under the [GNU General Public License v3.0](LICENSE). You may use, study, change and share it. If you distribute a modified version, it must also be open source under the GPL-3.0, so DMGram and anything built from it stay open for everyone to check.
+
 ---
 
 DMGram is an independent project, not affiliated with, endorsed by or connected to Instagram or Meta. "Instagram" is a trademark of Meta Platforms, Inc.

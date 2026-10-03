@@ -14,6 +14,12 @@ It's also **built to keep your account safe**: DMGram is simply Instagram's own 
 
 DMGram is free, open source, and not affiliated with Instagram or Meta.
 
+<p align="center">
+  <img src="assests/01.png" width="260" alt="DMGram screenshot 1">
+  &nbsp;&nbsp;
+  <img src="assests/02.png" width="260" alt="DMGram screenshot 2">
+</p>
+
 ## What it does
 
 **Home** shows your friends' stories on top and the people you follow below, newest first. Keep scrolling and you just see older posts from the same people. Nothing gets mixed in.

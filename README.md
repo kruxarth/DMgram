@@ -83,7 +83,7 @@ Every line of DMGram is in this repository. The security-relevant parts:
 
 ## Install
 
-1. Download `DMGram-vX.Y.Z.apk` from the [latest release](https://github.com/kruxarth/DMgram/releases/latest).
+1. Download [`DMGram.apk`](https://github.com/kruxarth/DMgram/releases/latest/download/DMGram.apk) (always the newest version), or pick a specific version from the [releases page](https://github.com/kruxarth/DMgram/releases).
 2. Open it. Android will ask you to allow installs from your browser or file manager.
 3. Log in with your Instagram account.
 
@@ -93,13 +93,13 @@ Requires Android 8.0 or newer.
 
 Android refuses an *update* signed by anyone else, but a *first* install has no such check. To make sure the APK is really this project's:
 
-1. Compare it with the `.sha256` file on the same release:
+1. Compare it with the `.sha256` file on the same release. The hash is the same for `DMGram.apk` and the versioned `DMGram-vX.Y.Z.apk`:
    ```
-   sha256sum DMGram-vX.Y.Z.apk
+   sha256sum DMGram.apk
    ```
 2. Check who signed it:
    ```
-   apksigner verify --print-certs DMGram-vX.Y.Z.apk
+   apksigner verify --print-certs DMGram.apk
    ```
    The certificate's SHA-256 digest must be:
    `ab50d0df3604a6b9dbead845dd9751f52495116a2ac4770033d69b1eb9f83827`

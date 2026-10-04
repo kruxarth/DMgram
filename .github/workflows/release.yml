@@ -67,9 +67,12 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           cp app/build/outputs/apk/release/app-release.apk "DMGram-v${version}.apk"
           sha256sum "DMGram-v${version}.apk" > "DMGram-v${version}.sha256"
+          # Same file under a fixed name, so the website can link to .../releases/latest/download/DMGram.apk
+          cp "DMGram-v${version}.apk" DMGram.apk
 
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
             DMGram-v*.apk
+            DMGram.apk
             DMGram-v*.sha256

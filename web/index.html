@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DMGram – Instagram without Reels, Explore or ads (Android)</title>
+<meta name="description" content="DMGram is a free, open-source Android app that keeps your friends' stories, posts and DMs from Instagram, and removes Reels, Explore, suggestions and ads.">
+<link rel="canonical" href="https://dmgram.vercel.app/">
+<meta name="theme-color" content="#d62976">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="DMGram – Instagram for your friends, not the algorithm">
+<meta property="og:description" content="Free, open-source Android app: stories, posts and DMs from the people you follow. No Reels, no Explore, no ads.">
+<meta property="og:url" content="https://dmgram.vercel.app/">
+<meta property="og:image" content="https://dmgram.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "DMGram",
+      "applicationCategory": "SocialNetworkingApplication",
+      "operatingSystem": "Android 8.0+",
+      "description": "Free, open-source Android app that shows only your friends' Instagram stories, posts and DMs.",
+      "downloadUrl": "https://github.com/kruxarth/DMgram/releases/latest",
+      "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@type": "Person", "name": "kruxarth", "url": "https://github.com/kruxarth" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Will my Instagram account get banned?",
+          "acceptedAnswer": { "@type": "Answer", "text": "It's very unlikely. DMGram shows Instagram's own website, like a phone browser does. It doesn't pretend to be the Instagram app, automate anything, or run in the background. Nobody outside Meta can promise what Instagram will do, though." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does DMGram collect my data or see my password?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. There is no DMGram server, account, analytics or tracking. You log in on Instagram's own login page and DMGram never reads what you type." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is DMGram free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. It is free and open source under the GPL-3.0 license." }
+        },
+        {
+          "@type": "Question",
+          "name": "Which Android versions does DMGram support?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Android 8.0 or newer." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does DMGram send notifications?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. An app built on a web page can't receive Instagram's push notifications. You see your unread count when you open the app." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+<style>
+:root{
+  --bg:#fff; --fg:#1c1c1e; --muted:#5f6368; --card:#fafafa; --line:#e6e6e6;
+  --grad:linear-gradient(45deg,#feda75,#fa7e1e 25%,#d62976 55%,#962fbf 78%,#4f5bd5);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0c0c0e; --fg:#f5f5f7; --muted:#a1a1a8; --card:#161619; --line:#2a2a2e}
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+main,footer{max-width:760px;margin:0 auto;padding:0 20px}
+.hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 0}
+.logo{width:72px;height:72px;border-radius:20px;margin-bottom:20px}
+h1{font-size:clamp(2.2rem,7vw,3.6rem);line-height:1.1;margin:0 0 16px;letter-spacing:-.02em}
+h1 span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{max-width:34em;color:var(--muted);margin:0 0 32px}
+.btn{display:inline-block;background:var(--grad);color:#fff;font-weight:700;font-size:1.1rem;text-decoration:none;padding:16px 36px;border-radius:999px;box-shadow:0 8px 24px rgba(214,41,118,.35);transition:transform .15s}
+.btn:hover{transform:translateY(-2px)}
+.btn:focus-visible,a:focus-visible{outline:3px solid #4f5bd5;outline-offset:3px}
+.note{font-size:.85rem;color:var(--muted);margin-top:14px}
+.shots{display:flex;gap:16px;justify-content:center;margin:0 0 56px}
+.shots img{width:calc(50% - 8px);max-width:260px;height:auto;aspect-ratio:1320/2868;border-radius:22px;border:1px solid var(--line)}
+section{margin-bottom:48px}
+h2{font-size:1.5rem;margin:0 0 16px}
+ul.feat{padding-left:1.2em;margin:0}
+ul.feat li{margin-bottom:6px}
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:10px}
+summary{cursor:pointer;font-weight:600}
+details p{margin:10px 0 0;color:var(--muted)}
+a{color:#d62976}
+.about{display:flex;gap:16px;align-items:center}
+.about img{width:56px;height:56px;border-radius:50%}
+footer{border-top:1px solid var(--line);padding-top:24px;padding-bottom:40px;font-size:.85rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <img class="logo" src="/favicon.svg" width="72" height="72" alt="DMGram logo">
+    <h1>Instagram for your friends,<br><span>not the algorithm.</span></h1>
+    <p class="lead">DMGram keeps your friends' stories, posts and DMs. No Reels, no Explore, no suggested posts, no ads. Free and open source for Android.</p>
+    <a class="btn" href="https://github.com/kruxarth/DMgram/releases/latest" rel="noopener">Download for Android</a>
+    <p class="note">Free APK · about 1.5 MB · Android 8.0+</p>
+  </header>
+
+  <div class="shots">
+    <img src="/shot-1.webp" width="480" height="1043" alt="DMGram home screen showing friends' stories and posts" loading="lazy">
+    <img src="/shot-2.webp" width="480" height="1043" alt="DMGram direct messages screen" loading="lazy">
+  </div>
+
+  <section>
+    <h2>What you get</h2>
+    <ul class="feat">
+      <li>Your friends' <strong>stories</strong> and <strong>posts</strong>, newest first</li>
+      <li>Your <strong>DMs</strong>: text, photos, voice clips, reactions</li>
+      <li>Search, profiles and follow requests</li>
+      <li>No tracking: there is no DMGram server, account or analytics</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Questions</h2>
+    <details><summary>Will my Instagram account get banned?</summary><p>It's very unlikely. DMGram shows Instagram's own website, like a phone browser does. It doesn't pretend to be the Instagram app, automate anything, or run in the background. Nobody outside Meta can promise what Instagram will do, though.</p></details>
+    <details><summary>Does DMGram collect my data or see my password?</summary><p>No. There is no DMGram server, account, analytics or tracking. You log in on Instagram's own login page and DMGram never reads what you type.</p></details>
+    <details><summary>Is DMGram free?</summary><p>Yes. It is free and open source under the GPL-3.0 license, so you can check every line.</p></details>
+    <details><summary>Which Android versions does DMGram support?</summary><p>Android 8.0 or newer.</p></details>
+    <details><summary>Does DMGram send notifications?</summary><p>No. An app built on a web page can't receive Instagram's push notifications. You see your unread count when you open the app.</p></details>
+  </section>
+
+  <section class="about">
+    <img src="https://github.com/kruxarth.png?size=112" width="56" height="56" alt="kruxarth, developer of DMGram" loading="lazy">
+    <p style="margin:0">Built by <a href="https://github.com/kruxarth" rel="noopener">kruxarth</a>, because opening Instagram to reply to a friend shouldn't end forty reels deep. <a href="https://github.com/kruxarth/DMgram" rel="noopener">Source code on GitHub</a>.</p>
+  </section>
+</main>
+<footer>
+  DMGram is an independent project, not affiliated with, endorsed by or connected to Instagram or Meta. "Instagram" is a trademark of Meta Platforms, Inc.
+</footer>
+</body>
+</html>

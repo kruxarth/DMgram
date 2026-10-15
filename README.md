@@ -89,6 +89,8 @@ Every line of DMGram is in this repository. The security-relevant parts:
 
 Requires Android 8.0 or newer.
 
+**Prefer automatic updates without any store?** Add this repository to [Obtainium](https://obtainium.imranr.dev/): open [this link](obtainium://add/https://github.com/kruxarth/DMgram) on your phone, or paste `https://github.com/kruxarth/DMgram` into Obtainium's *Add app* box. It installs straight from the releases above, signed by the same key.
+
 ### Checking the download (optional, recommended)
 
 Android refuses an *update* signed by anyone else, but a *first* install has no such check. To make sure the APK is really this project's:

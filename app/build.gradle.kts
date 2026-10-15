@@ -65,6 +65,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
+    // The Google-encrypted dependency blob in the APK is opaque; F-Droid and IzzyOnDroid reject it, and it
+    // keeps the APK reproducible.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true

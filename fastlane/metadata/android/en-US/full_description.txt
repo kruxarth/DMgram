@@ -1,0 +1,7 @@
+DMGram is Instagram's own website in a small native frame, with the algorithmic parts left out.
+
+You get your friends' stories and posts (newest first), your DMs, profiles and search. No Reels tab, no Explore, no suggested posts, no ads.
+
+It collects nothing: no analytics, no crash reporting, no account, no DMGram server. Everything you see comes straight from instagram.com. The only other network requests are an update check against this project's GitHub releases and the latest hide rules, at most once a day.
+
+Not affiliated with Instagram or Meta.

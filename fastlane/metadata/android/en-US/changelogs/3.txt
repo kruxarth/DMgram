@@ -1,0 +1,1 @@
+Post photos and stories from the + on Home (can be turned off in About).

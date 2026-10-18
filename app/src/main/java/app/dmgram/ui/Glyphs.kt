@@ -21,6 +21,7 @@ object Glyphs {
     private const val SHOULDERS = "M4 21 A8 7 0 0 1 20 21 Z"
     private const val LENS = "M10.5 3 A7.5 7.5 0 1 1 10.5 18 A7.5 7.5 0 1 1 10.5 3 Z"
     private const val HANDLE = "M16 16 L21 21"
+    private const val PLUS = "M12 4 V20 M4 12 H20"
     private const val HEART = "M12 20.5 C8 17.3 3 13.6 3 8.9 A4.9 4.9 0 0 1 12 6.2 A4.9 4.9 0 0 1 21 8.9 C21 13.6 16 17.3 12 20.5 Z"
 
     val HomeOutline = icon("home", stroke = listOf(HOUSE))
@@ -31,6 +32,7 @@ object Glyphs {
     val PersonFilled = icon("person.fill", fill = listOf(HEAD, SHOULDERS), stroke = listOf(HEAD, SHOULDERS))
     val Search = icon("search", stroke = listOf(LENS, HANDLE))
     val Heart = icon("heart", stroke = listOf(HEART))
+    val Plus = icon("plus", stroke = listOf(PLUS))
 
     private fun icon(
         name: String,

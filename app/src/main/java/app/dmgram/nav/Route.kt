@@ -20,6 +20,7 @@ enum class RouteClass {
     EXPLORE_BLOCKED,
     ACTIVITY,
     PROFILE,
+    CREATE,
     ACCOUNT,
     AUTH,
     EXTERNAL,
@@ -86,6 +87,9 @@ private val INSTAGRAM_HOSTS = setOf(
     "m.instagram.com",
 )
 
+/** Instagram's composers: `/create/story/` (from "Your story") and `/create/style/` onward (profile "+"). */
+private val CREATE_PATH = Regex("^/create/.+")
+
 fun classify(raw: String, rules: CompiledRules): Classified {
     val trimmed = raw.trim()
     val uri = try {
@@ -108,6 +112,10 @@ fun classify(raw: String, rules: CompiledRules): Classified {
         return Classified(RouteClass.EXTERNAL, unwrapped.toString(), "https")
     }
     val path = normalizePath(unwrapped.path)
+    // Built in, not in rules.json: older apps reject remote rules that name a class they don't know.
+    if (host in INSTAGRAM_HOSTS && CREATE_PATH.matches(path)) {
+        return Classified(RouteClass.CREATE, unwrapped.toString(), "https")
+    }
     for (pattern in rules.patterns) {
         // Remote rules may list hosts, but never outside instagram.com: a route decides what loads inside DMGram.
         val hostOk = if (pattern.hosts.isEmpty()) host in INSTAGRAM_HOSTS else host in pattern.hosts && isInstagramHost(host)

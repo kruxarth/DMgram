@@ -22,7 +22,8 @@ fun chromeFor(tab: Tab, route: RouteClass, atRoot: Boolean): Chrome = when (rout
         Chrome(showTabBar = false, showHomeHeader = false, fullScreen = false, pullToRefresh = false)
     RouteClass.STORY, RouteClass.REEL_SINGLE ->
         Chrome(showTabBar = false, showHomeHeader = false, fullScreen = true, pullToRefresh = false)
-    RouteClass.AUTH ->
+    // The composer has its own header and Next/Share buttons, like the app's.
+    RouteClass.AUTH, RouteClass.CREATE ->
         Chrome(showTabBar = false, showHomeHeader = false, fullScreen = false, pullToRefresh = false)
     RouteClass.PROFILE ->
         if (tab == Tab.PROFILE && atRoot) {

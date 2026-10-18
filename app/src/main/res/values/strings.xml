@@ -8,6 +8,9 @@
     <string name="tab_profile">Profile</string>
     <string name="header_search">Search</string>
     <string name="header_activity">Activity</string>
+    <string name="header_create">New post or story</string>
+    <string name="create_post">Post</string>
+    <string name="create_story">Story</string>
     <string name="blocked_notice">Not available in DMGram</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_rules">Rules version %1$d</string>
@@ -16,6 +19,8 @@
     <string name="about_update_available">Update available</string>
     <string name="about_github">GitHub</string>
     <string name="about_report">Report a problem</string>
+    <string name="about_create">Show create button</string>
+    <string name="about_create_hint">The + on Home for posting photos and stories</string>
     <string name="update_available">Update available · v%1$s</string>
     <string name="update_install">Install</string>
     <string name="update_dismiss">Dismiss</string>

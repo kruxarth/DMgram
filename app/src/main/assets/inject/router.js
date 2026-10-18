@@ -51,6 +51,10 @@
       return { class: "EXTERNAL", url: target.toString(), scheme: "https" };
     }
     const path = normalizePath(target.pathname);
+    // Built in, not in rules.json: older apps reject remote rules that name a class they don't know.
+    if (INSTAGRAM_HOSTS[host] && /^\/create\/.+/.test(path)) {
+      return { class: "CREATE", url: target.toString(), scheme: "https" };
+    }
     const reserved = new Set(((rules && rules.reserved) || []).map((name) => String(name).toLowerCase()));
     const routes = (rules && rules.routes) || [];
     for (const route of routes) {

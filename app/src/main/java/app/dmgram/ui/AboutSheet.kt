@@ -1,6 +1,7 @@
 package app.dmgram.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,11 +16,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +42,7 @@ data class AboutState(
     val rulesVersion: Int,
     val status: UpdateStatus,
     val githubRepo: String,
+    val createEnabled: Boolean,
 )
 
 /** Calm, Instagram-settings-like sheet: identity on top, a status line, then plain rows. */
@@ -49,6 +54,7 @@ fun AboutSheet(
     onInstall: () -> Unit,
     onGitHub: () -> Unit,
     onReport: () -> Unit,
+    onToggleCreate: (Boolean) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     ModalBottomSheet(
@@ -97,12 +103,51 @@ fun AboutSheet(
                     }
                 }
             }
-            if (state.githubRepo.isNotBlank()) {
-                HorizontalDivider(
-                    thickness = 0.5.dp,
-                    color = colors.outlineVariant,
-                    modifier = Modifier.padding(top = 8.dp),
+            HorizontalDivider(
+                thickness = 0.5.dp,
+                color = colors.outlineVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = state.createEnabled,
+                        role = Role.Switch,
+                        onValueChange = onToggleCreate,
+                    )
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.about_create),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.onSurface,
+                    )
+                    Text(
+                        text = stringResource(R.string.about_create_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
+                // The row handles the tap; the switch only shows the state.
+                Switch(
+                    checked = state.createEnabled,
+                    onCheckedChange = null,
+                    // Instagram's settings toggles: monochrome, not Material's accent.
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = colors.onSurface,
+                        checkedThumbColor = colors.surfaceContainerLow,
+                        checkedBorderColor = colors.onSurface,
+                        uncheckedTrackColor = colors.surfaceContainerLow,
+                        uncheckedThumbColor = colors.onSurfaceVariant,
+                        uncheckedBorderColor = colors.onSurfaceVariant,
+                    ),
                 )
+            }
+            if (state.githubRepo.isNotBlank()) {
+                HorizontalDivider(thickness = 0.5.dp, color = colors.outlineVariant)
                 SheetRow(stringResource(R.string.about_github), onGitHub)
                 SheetRow(stringResource(R.string.about_report), onReport)
             }

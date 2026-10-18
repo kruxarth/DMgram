@@ -58,6 +58,8 @@
   {"tab": "HOME", "url": "https://www.instagram.com/example_user/following/", "expectedClass": "PROFILE", "expectedAction": "ALLOW"},
   {"tab": "HOME", "url": "https://www.instagram.com/example_user/saved/", "expectedClass": "PROFILE", "expectedAction": "ALLOW"},
   {"tab": "HOME", "url": "https://www.instagram.com/create/", "expectedClass": "PROFILE", "expectedAction": "ALLOW"},
+  {"tab": "PROFILE", "url": "https://www.instagram.com/create/style/", "expectedClass": "CREATE", "expectedAction": "ALLOW"},
+  {"tab": "PROFILE", "url": "https://www.instagram.com/create/details/", "expectedClass": "CREATE", "expectedAction": "ALLOW"},
   {"tab": "HOME", "url": "https://www.instagram.com/about/", "expectedClass": "UNKNOWN", "expectedAction": "ALLOW"},
   {"tab": "HOME", "url": "https://www.instagram.com/legal/", "expectedClass": "UNKNOWN", "expectedAction": "ALLOW"},
   {"tab": "HOME", "url": "https://www.instagram.com/developer/", "expectedClass": "UNKNOWN", "expectedAction": "ALLOW"},
@@ -106,7 +108,7 @@
   {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/direct/inbox/", "expectedClass": "DIRECT_INBOX", "expectedAction": "SWITCH", "expectedTab": "DMS"},
   {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/reels/", "expectedClass": "REELS_FEED", "expectedAction": "BLOCK"},
   {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/explore/tags/test/", "expectedClass": "EXPLORE_BLOCKED", "expectedAction": "BLOCK"},
-  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/create/story/", "expectedClass": "UNKNOWN", "expectedAction": "ALLOW"},
+  {"tab": "HOME", "surface": "STORIES", "url": "https://www.instagram.com/create/story/", "expectedClass": "CREATE", "expectedAction": "ALLOW"},
   {"tab": "HOME", "surface": "STORIES", "url": "https://example.com/page", "expectedClass": "EXTERNAL", "expectedAction": "EXTERNAL"},
   {"tab": "HOME", "surface": "FEED", "url": "https://www.instagram.com/friend_a/", "expectedClass": "PROFILE", "expectedAction": "ALLOW"}
 ]

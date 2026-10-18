@@ -27,12 +27,13 @@ import app.dmgram.R
 import app.dmgram.ui.theme.wordmarkStyle
 import app.dmgram.ui.theme.Dimens
 
-/** Instagram's home header layout: wordmark left, two actions right. The wordmark opens About. */
+/** Instagram's home header layout: wordmark left, actions right (+ only when enabled). The wordmark opens About. */
 @Composable
 fun HomeHeader(
     onTitleClick: () -> Unit,
     onSearch: () -> Unit,
     onActivity: () -> Unit,
+    onCreate: (() -> Unit)?,
 ) {
     Row(
         modifier = Modifier
@@ -53,6 +54,10 @@ fun HomeHeader(
             ),
         )
         Spacer(modifier = Modifier.weight(1f))
+        if (onCreate != null) {
+            HeaderAction(Glyphs.Plus, stringResource(R.string.header_create), onCreate)
+            Spacer(modifier = Modifier.width(4.dp))
+        }
         HeaderAction(Glyphs.Search, stringResource(R.string.header_search), onSearch)
         Spacer(modifier = Modifier.width(4.dp))
         HeaderAction(Glyphs.Heart, stringResource(R.string.header_activity), onActivity)

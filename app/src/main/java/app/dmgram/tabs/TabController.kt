@@ -25,6 +25,7 @@ import androidx.webkit.WebViewCompat
 import app.dmgram.BuildConfig
 import app.dmgram.DMGramApp
 import app.dmgram.nav.Chrome
+import app.dmgram.R
 import app.dmgram.nav.CompiledRules
 import app.dmgram.nav.NavAction
 import app.dmgram.nav.RouteClass
@@ -55,6 +56,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -93,6 +96,12 @@ class TabController(
     private var refreshing = false
     private var blockedVisible = false
     private var aboutOpen = false
+
+    /** The Home header's + (About sheet switch). Off: Home is for scrolling only. */
+    private var createEnabled = true
+
+    /** The Post/Story menu is open in the stories strip; the strip stays pinned under the header meanwhile. */
+    private var createOpen = false
     private var pageDark: Boolean? = null
     private var keyboardOpen = false
     private var remoteJob: Job? = null
@@ -115,6 +124,7 @@ class TabController(
         rulesVersion = parsed.version
         loggedIn = LoginState.isLoggedIn()
         trayDp = prefs.getInt(KEY_TRAY_DP, 0).coerceIn(0, 400)
+        createEnabled = prefs.getBoolean(KEY_CREATE, true)
         create(Tab.HOME, load = true)
         if (loggedIn) createSlot(stories, load = true)
         if (!incoming.isNullOrBlank()) openIncoming(incoming)
@@ -138,6 +148,8 @@ class TabController(
             refreshing = refreshing,
             blockedVisible = blockedVisible,
             aboutOpen = aboutOpen,
+            createEnabled = createEnabled,
+            showCreate = createEnabled && loggedIn && stories.web != null && stories.loadError == null && trayDp > 0,
             pageDark = pageDark,
             rulesVersion = rulesVersion,
             update = updateInfo,
@@ -159,6 +171,7 @@ class TabController(
             eval(slots.getValue(current).web, "pauseMedia()")
             if (current == Tab.HOME) eval(stories.web, "pauseMedia()")
         }
+        if (tab != current) closeCreate()
         current = tab
         reveal(tab)
         publish()
@@ -204,6 +217,10 @@ class TabController(
         if (aboutOpen) {
             aboutOpen = false
             publish()
+            return
+        }
+        if (createOpen) {
+            closeCreate()
             return
         }
         if (slot.reelLocked) {
@@ -284,6 +301,43 @@ class TabController(
             stories.loadError = null
             stories.web?.reload()
         }
+        publish()
+    }
+
+    /**
+     * The header's +. Instagram only opens its photo picker from a tap inside the page, so the menu is drawn in the
+     * stories strip, right under the header, over Instagram's own (hidden) upload inputs. The tap on Post or Story
+     * lands on the real input.
+     */
+    fun toggleCreate() {
+        if (createOpen) {
+            closeCreate()
+            return
+        }
+        val web = stories.web ?: return
+        createOpen = true
+        layoutStrip()
+        val config = buildJsonObject {
+            put("post", activity.getString(R.string.create_post))
+            put("story", activity.getString(R.string.create_story))
+            put("dark", pageDark ?: isDark())
+            // Right-aligned under the +: HomeHeader end padding 4 + heart 44 + gap 4 + search 44 + gap 4 (dp = CSS px).
+            put("right", CREATE_MENU_RIGHT_DP)
+        }
+        eval(web, "openCreate(${config})")
+    }
+
+    private fun closeCreate() {
+        if (!createOpen) return
+        createOpen = false
+        eval(stories.web, "closeCreate()")
+        layoutStrip()
+    }
+
+    fun setCreateEnabled(enabled: Boolean) {
+        createEnabled = enabled
+        prefs.edit().putBoolean(KEY_CREATE, enabled).apply()
+        if (!enabled) closeCreate()
         publish()
     }
 
@@ -465,7 +519,7 @@ class TabController(
     /** Per scroll frame: the strip scrolls away with the feed and returns at the top, like the app. */
     private fun positionStrip() {
         val web = stories.web ?: return
-        val offset = if (storiesExpanded()) 0f else -min(feedY * density, stripPx().toFloat())
+        val offset = if (storiesExpanded() || createOpen) 0f else -min(feedY * density, stripPx().toFloat())
         if (web.translationY != offset) web.translationY = offset
     }
 
@@ -520,6 +574,13 @@ class TabController(
             FrameLayout.LayoutParams.MATCH_PARENT,
         )
         WebViewFactory.configure(web)
+        if (slot.surface == Surface.FEED) {
+            // The create menu lives in the strip, which only sees its own taps: a tap on the feed dismisses it too.
+            web.setOnTouchListener { _, event ->
+                if (event.actionMasked == MotionEvent.ACTION_DOWN && createOpen) closeCreate()
+                false
+            }
+        }
         web.setDownloadListener { url, _, _, _, _ ->
             // Only https: a blob:/data: download would hand page content to whatever handles it.
             if (!url.startsWith("https://", ignoreCase = true)) return@setDownloadListener
@@ -648,6 +709,8 @@ class TabController(
         if (event is BridgeEvent.ScrollY) {
             if (slot.surface == Surface.FEED) {
                 feedY = event.y
+                // Like a popup menu: scrolling the feed dismisses it rather than dragging it along.
+                if (createOpen) closeCreate()
                 positionStrip()
             }
             return
@@ -686,6 +749,10 @@ class TabController(
                 if (slot.tab == Tab.HOME && slot.surface == Surface.FEED) onHomeReady()
             }
             is BridgeEvent.Log -> Log.i(DMGramApp.TAG, "${event.level} ${event.msg}")
+            BridgeEvent.CreateClosed -> if (slot.surface == Surface.STORIES && createOpen) {
+                createOpen = false
+                layoutStrip()
+            }
             is BridgeEvent.ReelLock -> {
                 slot.reelLocked = event.active
                 Log.i(DMGramApp.TAG, "Reel lock ${slot.tab.name} active=${event.active}")
@@ -766,6 +833,7 @@ class TabController(
         slot.canGoBack = slot.web?.canGoBack() == true
         val decision = decide(slot.tab, url, compiled, slot.surface)
         slot.route = decision.route
+        if (slot.surface == Surface.STORIES && decision.route != RouteClass.HOME_FEED) createOpen = false
         if (slot.surface == Surface.FEED) {
             eval(slot.web, "setStrip(${stripFor(slot)})")
             val now = SystemClock.uptimeMillis()
@@ -1155,6 +1223,8 @@ class TabController(
         private const val KEY_USERNAME = "username"
         private const val KEY_UPDATE_DISMISSED = "update.dismissed"
         private const val KEY_TRAY_DP = "home.trayDp"
+        private const val KEY_CREATE = "home.createButton"
+        private const val CREATE_MENU_RIGHT_DP = 100
         private const val STORIES_URL = "https://www.instagram.com/"
         private const val FOLLOWING_QUERY = "variant=following"
         private const val LOGIN_URL = "https://www.instagram.com/accounts/login/"

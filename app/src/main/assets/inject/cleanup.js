@@ -233,6 +233,154 @@ if (CONFIG.surface === "STORIES" && window.__dmgram && window.__dmgram.on) {
   });
 }
 
+// Home header +: the Post/Story menu, drawn in the stories strip right under the native header. A WebView only
+// opens the photo picker for a real tap on a file input, so each row has one of Instagram's own upload inputs
+// (they live, hidden, in Instagram's header) stretched over it at opacity 0. Instagram's change handler then
+// opens its composer exactly as its own + would.
+let createMenu = null;
+
+function createInputs() {
+  const inputs = Array.from(document.querySelectorAll("header input[type='file']"));
+  // Seen on device: the JPEG-only input opens /create/style/ (post), the AVIF/JPEG/PNG one /create/story/.
+  const post = inputs.find((input) => (input.getAttribute("accept") || "").trim() === "image/jpeg") || null;
+  const story = inputs.find((input) => input !== post) || null;
+  return { post, story };
+}
+
+function createIcon(kind) {
+  const paths = kind === "post"
+    ? '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>'
+    : '<circle cx="12" cy="12" r="9" stroke-dasharray="3 2.2"/><path d="M12 8v8M8 12h8"/>';
+  return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + "</svg>";
+}
+
+function openCreate(config) {
+  if (CONFIG.surface !== "STORIES") return;
+  closeCreate(false);
+  const inputs = createInputs();
+  if (!inputs.post && !inputs.story) {
+    window.__dmgramLog("warn", "create: no upload inputs in the header");
+    window.__dmgramPost({ type: "createClosed" });
+    return;
+  }
+  // Instagram's own mode class on <html>; native's guess only until Instagram has picked one.
+  const root = document.documentElement;
+  const dark = root.classList.contains("__fb-dark-mode") ||
+    (!root.classList.contains("__fb-light-mode") && !!(config && config.dark));
+  const menu = document.createElement("div");
+  menu.id = "dmgram-create";
+  menu.setAttribute("role", "menu");
+  menu.style.cssText = [
+    "position:fixed", "top:4px", "right:" + Math.round((config && config.right) || 8) + "px", "z-index:2147483646",
+    "min-width:148px", "padding:6px 0", "border-radius:12px",
+    "background:" + (dark ? "#262626" : "#ffffff"), "color:" + (dark ? "#f5f5f5" : "#000000"),
+    "box-shadow:0 4px 16px rgba(0,0,0," + (dark ? "0.5" : "0.15") + ")",
+    "font:400 16px/20px -apple-system,system-ui,Roboto,sans-serif",
+    "transform-origin:top right", "transition:opacity 120ms ease-out, transform 120ms ease-out",
+    "opacity:0", "transform:scale(0.95)",
+    // Taps fall through to the inputs: they sit in Instagram's fixed header, a stacking context of its own,
+    // so no z-index can lift them above this menu.
+    "pointer-events:none",
+  ].join(";");
+  const rows = [];
+  for (const kind of ["post", "story"]) {
+    const input = inputs[kind];
+    if (!input) continue;
+    const row = document.createElement("div");
+    row.setAttribute("role", "menuitem");
+    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:24px;height:44px;padding:0 16px";
+    const label = document.createElement("span");
+    label.textContent = String((config && config[kind]) || (kind === "post" ? "Post" : "Story"));
+    row.appendChild(label);
+    row.insertAdjacentHTML("beforeend", createIcon(kind));
+    menu.appendChild(row);
+    rows.push({ row, input, kind });
+  }
+  document.documentElement.appendChild(menu);
+  for (const { row, input, kind } of rows) {
+    // Un-hide the input's ancestors at zero height so the input itself can take taps. Stop where the tray's
+    // branch joins: those ancestors are already shown, and collapsing them would collapse the tray too.
+    for (let el = input.parentElement; el && el !== document.body && !el.hasAttribute("data-dmgram-tray-path"); el = el.parentElement) {
+      el.setAttribute("data-dmgram-create-path", "");
+    }
+    input.setAttribute("data-dmgram-create-input", kind);
+    // offsetTop/offsetWidth ignore the opening scale animation; the menu's resting box is what the finger sees.
+    const menuBox = { left: window.innerWidth - Math.round((config && config.right) || 8) - menu.offsetWidth, top: 4 };
+    const box = { left: menuBox.left + row.offsetLeft, top: menuBox.top + row.offsetTop, width: row.offsetWidth, height: row.offsetHeight };
+    input.style.setProperty("left", box.left + "px", "important");
+    input.style.setProperty("top", box.top + "px", "important");
+    input.style.setProperty("width", box.width + "px", "important");
+    input.style.setProperty("height", box.height + "px", "important");
+    input.addEventListener("click", onCreatePick);
+  }
+  createMenu = menu;
+  document.addEventListener("pointerdown", onCreateOutside, true);
+  requestAnimationFrame(() => {
+    menu.style.opacity = "1";
+    menu.style.transform = "none";
+  });
+}
+
+function onCreatePick(event) {
+  if (event.currentTarget.getAttribute("data-dmgram-create-input") === "post") startPostSession();
+  // The picker is opening; the input keeps its change handler wherever it sits, so the menu can go.
+  setTimeout(() => closeCreate(true), 0);
+}
+
+// Instagram's own Post menu item opens the picker and starts a creation session in its Redux store; the
+// post input's change handler throws without one (nullthrows on creation.sessionId). Stories need none.
+function startPostSession() {
+  try {
+    const input = document.querySelector('[data-dmgram-create-input="post"]');
+    const key = input && Object.keys(input).find((name) => name.startsWith("__reactFiber"));
+    let store = null;
+    for (let fiber = key ? input[key] : null; fiber && !store; fiber = fiber.return) {
+      const props = fiber.memoizedProps;
+      if (props && props.store && typeof props.store.dispatch === "function") store = props.store;
+    }
+    if (!store || typeof window.require !== "function") throw new Error("no store or require");
+    const session = window.require("PolarisCreationActionStartCreationSession");
+    const mode = window.require("PolarisCreationMode");
+    store.dispatch(session.startCreationSession(mode.CreationMode.POST));
+  } catch (error) {
+    window.__dmgramLog("warn", "create: post session not started: " + error);
+  }
+}
+
+function onCreateOutside(event) {
+  const target = event.target;
+  if (target && target.hasAttribute && target.hasAttribute("data-dmgram-create-input")) return;
+  if (createMenu && createMenu.contains(target)) return;
+  closeCreate(true);
+  // Like any popup menu, the dismissing tap does nothing else (it would open the story under the finger).
+  const swallow = (click) => {
+    click.preventDefault();
+    click.stopPropagation();
+  };
+  document.addEventListener("click", swallow, { capture: true, once: true });
+  setTimeout(() => document.removeEventListener("click", swallow, true), 600);
+}
+
+function closeCreate(notify) {
+  document.removeEventListener("pointerdown", onCreateOutside, true);
+  document.querySelectorAll("[data-dmgram-create-input]").forEach((input) => {
+    input.removeEventListener("click", onCreatePick);
+    input.removeAttribute("data-dmgram-create-input");
+    for (const prop of ["left", "top", "width", "height"]) input.style.removeProperty(prop);
+  });
+  document.querySelectorAll("[data-dmgram-create-path]").forEach((el) => el.removeAttribute("data-dmgram-create-path"));
+  const had = !!createMenu;
+  if (createMenu) createMenu.remove();
+  createMenu = null;
+  if (had && notify === true) window.__dmgramPost({ type: "createClosed" });
+}
+
+if (window.__dmgram) {
+  window.__dmgram.openCreate = openCreate;
+  window.__dmgram.closeCreate = closeCreate;
+}
+
 const kidCursor = new WeakMap();
 let pending = [];
 let pendingAt = 0;

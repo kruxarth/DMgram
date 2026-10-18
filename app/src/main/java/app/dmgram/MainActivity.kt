@@ -135,6 +135,8 @@ class MainActivity : ComponentActivity() {
                     onTitle = tabs::openAbout,
                     onSearch = tabs::openSearch,
                     onActivity = tabs::openActivity,
+                    onCreate = tabs::toggleCreate,
+                    onToggleCreate = tabs::setCreateEnabled,
                     onDismissAbout = tabs::dismissAbout,
                     onInstall = tabs::installUpdate,
                     onDismissUpdate = tabs::dismissUpdate,
@@ -252,6 +254,8 @@ private fun DmgramFrame(
     onTitle: () -> Unit,
     onSearch: () -> Unit,
     onActivity: () -> Unit,
+    onCreate: () -> Unit,
+    onToggleCreate: (Boolean) -> Unit,
     onDismissAbout: () -> Unit,
     onInstall: () -> Unit,
     onDismissUpdate: () -> Unit,
@@ -307,6 +311,7 @@ private fun DmgramFrame(
                     onTitleClick = onTitle,
                     onSearch = onSearch,
                     onActivity = onActivity,
+                    onCreate = if (frame.showCreate) onCreate else null,
                 )
             }
             Box(
@@ -365,11 +370,13 @@ private fun DmgramFrame(
                     rulesVersion = frame.rulesVersion,
                     status = status,
                     githubRepo = BuildConfig.GITHUB_REPO,
+                    createEnabled = frame.createEnabled,
                 ),
                 onDismiss = onDismissAbout,
                 onInstall = onInstall,
                 onGitHub = onGitHub,
                 onReport = onReport,
+                onToggleCreate = onToggleCreate,
             )
         }
     }

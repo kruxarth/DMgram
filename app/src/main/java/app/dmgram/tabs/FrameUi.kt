@@ -18,6 +18,8 @@ data class FrameUi(
     val refreshing: Boolean = false,
     val blockedVisible: Boolean = false,
     val aboutOpen: Boolean = false,
+    val createEnabled: Boolean = true,
+    val showCreate: Boolean = false,
     val pageDark: Boolean? = null,
     val rulesVersion: Int = 1,
     val update: UpdateInfo? = null,

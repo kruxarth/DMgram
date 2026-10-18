@@ -33,6 +33,9 @@ sealed interface BridgeEvent {
     data object Ready : BridgeEvent
     data class Log(val level: String, val msg: String) : BridgeEvent
     data class ReelLock(val active: Boolean) : BridgeEvent
+
+    /** Stories strip: the create menu closed itself (outside tap, or a picker opened). */
+    data object CreateClosed : BridgeEvent
 }
 
 object Bridge {
@@ -104,6 +107,7 @@ object Bridge {
                 if (!BuildConfig.DEBUG) return null
                 BridgeEvent.Log(text(obj, "level", 20) ?: "info", text(obj, "msg", 500) ?: "")
             }
+            "createClosed" -> BridgeEvent.CreateClosed
             "reelLock" -> obj["active"]?.jsonPrimitive?.booleanOrNull?.let(BridgeEvent::ReelLock)
             else -> null
         }

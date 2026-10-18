@@ -18,6 +18,15 @@ class UpdateDecisionTest {
     }
 
     @Test
+    fun onlyVersionsNewerThanTheInstalledOneCount() {
+        assertTrue(UpdateDecision.newerThan("0.1.2", "0.1.1"))
+        assertTrue(UpdateDecision.newerThan("v9.9.9", "0.1.0"))
+        assertFalse(UpdateDecision.newerThan("0.1.1", "0.1.1"))
+        assertFalse(UpdateDecision.newerThan("0.1.1", "0.1.2"))
+        assertFalse(UpdateDecision.newerThan("latest", "0.1.0"))
+    }
+
+    @Test
     fun olderOrEqualOrApkLessIsIgnored() {
         assertNull(UpdateDecision.parse(release("v0.0.1"), "0.1.0", REPO))
         assertNull(UpdateDecision.parse(release("v0.1.0"), "0.1.0", REPO))

@@ -1108,7 +1108,7 @@ class TabController(
         if (!foreground) return
         remoteJob?.cancel()
         val dismissed = prefs.getString(KEY_UPDATE_DISMISSED, null)
-        updateInfo = if (updateChecker.url() == null) null else updateChecker.saved()
+        updateInfo = if (updateChecker.url() == null) null else updateChecker.saved(BuildConfig.VERSION_NAME)
         updateDismissed = updateInfo?.version == dismissed
         checkingUpdate = updateChecker.url() != null && updateChecker.due() && updateInfo == null
         publish()

@@ -30,8 +30,9 @@ class UpdateChecker(
         return now() - prefs.getLong(KEY_FETCHED, 0L) >= INTERVAL_MS
     }
 
-    fun saved(): UpdateInfo? {
+    fun saved(currentVersion: String): UpdateInfo? {
         val version = prefs.getString(KEY_VERSION, null)?.takeIf { it.isNotBlank() } ?: return null
+        if (!UpdateDecision.newerThan(version, currentVersion)) return null
         val apk = prefs.getString(KEY_APK, null)
             ?.takeIf { UpdateDecision.trustedApk(it, BuildConfig.GITHUB_REPO) } ?: return null
         val page = prefs.getString(KEY_PAGE, null).orEmpty()
@@ -81,6 +82,6 @@ class UpdateChecker(
         private const val KEY_VERSION = "update.version"
         private const val KEY_APK = "update.apk"
         private const val KEY_PAGE = "update.page"
-        private const val INTERVAL_MS = 24L * 60L * 60L * 1000L
+        private const val INTERVAL_MS = 6L * 60L * 60L * 1000L
     }
 }

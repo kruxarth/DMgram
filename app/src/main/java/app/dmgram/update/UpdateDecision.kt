@@ -18,6 +18,12 @@ object UpdateDecision {
             !rest.contains("..")
     }
 
+    fun newerThan(version: String, currentVersion: String): Boolean {
+        val remote = SemVer.parse(version) ?: return false
+        val current = SemVer.parse(currentVersion) ?: return false
+        return remote > current
+    }
+
     fun parse(body: String, currentVersion: String, repo: String): UpdateInfo? {
         val release = try {
             json.decodeFromString<GitHubRelease>(body)
@@ -25,8 +31,7 @@ object UpdateDecision {
             return null
         }
         val remote = SemVer.parse(release.tagName) ?: return null
-        val current = SemVer.parse(currentVersion) ?: return null
-        if (remote <= current) return null
+        if (!newerThan(release.tagName, currentVersion)) return null
         val apk = release.assets.firstOrNull { asset ->
             trustedApk(asset.browserDownloadUrl, repo)
         }?.browserDownloadUrl.orEmpty()

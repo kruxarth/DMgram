@@ -1,15 +1,18 @@
 package app.dmgram.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,6 +27,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.dmgram.R
+import app.dmgram.ui.theme.BadgeRed
 import app.dmgram.ui.theme.wordmarkStyle
 import app.dmgram.ui.theme.Dimens
 
@@ -33,6 +37,7 @@ fun HomeHeader(
     onTitleClick: () -> Unit,
     onSearch: () -> Unit,
     onActivity: () -> Unit,
+    activity: Boolean,
     onCreate: (() -> Unit)?,
 ) {
     Row(
@@ -60,12 +65,17 @@ fun HomeHeader(
         }
         HeaderAction(Glyphs.Search, stringResource(R.string.header_search), onSearch)
         Spacer(modifier = Modifier.width(4.dp))
-        HeaderAction(Glyphs.Heart, stringResource(R.string.header_activity), onActivity)
+        HeaderAction(
+            icon = Glyphs.Heart,
+            label = stringResource(if (activity) R.string.header_activity_new else R.string.header_activity),
+            onClick = onActivity,
+            dot = activity,
+        )
     }
 }
 
 @Composable
-private fun HeaderAction(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun HeaderAction(icon: ImageVector, label: String, onClick: () -> Unit, dot: Boolean = false) {
     Box(
         modifier = Modifier
             .size(44.dp)
@@ -83,5 +93,15 @@ private fun HeaderAction(icon: ImageVector, label: String, onClick: () -> Unit) 
             tint = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.size(Dimens.tabIcon),
         )
+        // Instagram's new-activity dot sits just below the heart, in the DM badge red.
+        if (dot) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = Dimens.tabIcon / 2 + 4.dp)
+                    .size(8.dp)
+                    .background(BadgeRed, CircleShape),
+            )
+        }
     }
 }

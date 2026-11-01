@@ -339,6 +339,37 @@ function publishUnread() {
   window.__dmgramPost({ type: "unread", count });
 }
 
+// New activity (follow requests, likes) for the native header heart. Instagram's own header is hidden
+// but stays in the DOM; its heart shows a red dot or a count when there is something new. Style reads
+// only happen when the link's markup changes, not on every page mutation.
+let activityKey = "";
+let lastActivity = null;
+function publishActivity() {
+  if (CONFIG.tab !== "HOME") return;
+  const link = document.querySelector('a[href="/notifications/"], a[href="/notifications"]');
+  if (!link) return;
+  const parts = link.querySelectorAll("*");
+  const key = parts.length + "|" + (link.textContent || "");
+  if (key === activityKey) return;
+  activityKey = key;
+  let dot = false;
+  for (const el of parts) {
+    if (el.closest("svg")) continue;
+    if (/^\d+\+?$/.test((el.textContent || "").trim())) {
+      dot = true;
+      break;
+    }
+    const bg = (getComputedStyle(el).backgroundColor || "").match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/);
+    if (bg && +bg[1] > 200 && +bg[2] < 100 && +bg[3] < 120 && (bg[4] === undefined || +bg[4] > 0.5)) {
+      dot = true;
+      break;
+    }
+  }
+  if (dot === lastActivity) return;
+  lastActivity = dot;
+  window.__dmgramPost({ type: "activity", dot });
+}
+
 let readyKey = "";
 function publishReady() {
   const route = (window.__dmgram && window.__dmgram.route) || "";
@@ -376,6 +407,7 @@ function scheduleScan() {
     publishUsername();
     publishAvatar();
     publishUnread();
+    publishActivity();
     publishReady();
   });
 }

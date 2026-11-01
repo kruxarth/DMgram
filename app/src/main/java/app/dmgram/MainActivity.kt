@@ -311,6 +311,7 @@ private fun DmgramFrame(
                     onTitleClick = onTitle,
                     onSearch = onSearch,
                     onActivity = onActivity,
+                    activity = frame.activity,
                     onCreate = if (frame.showCreate) onCreate else null,
                 )
             }

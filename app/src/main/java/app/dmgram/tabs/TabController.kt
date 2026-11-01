@@ -91,6 +91,7 @@ class TabController(
     private var loggedIn = false
     private var username: String? = null
     private var homeUnread: Int? = null
+    private var activityDot = false
     private var avatar: ImageBitmap? = null
     private var titleUnread: Int? = null
     private var refreshing = false
@@ -144,6 +145,7 @@ class TabController(
             progress = slot.progress,
             ready = slot.ready,
             unread = homeUnread ?: titleUnread ?: 0,
+            activity = activityDot,
             avatar = avatar,
             refreshing = refreshing,
             blockedVisible = blockedVisible,
@@ -346,6 +348,9 @@ class TabController(
     }
 
     fun openActivity() {
+        // Opening the page is seeing it: Instagram clears its own dot the same way.
+        activityDot = false
+        publish()
         eval(slots.getValue(current).web, "navigate(${jsQuote("/notifications/")})")
     }
 
@@ -725,6 +730,7 @@ class TabController(
             is BridgeEvent.Unread -> {
                 if (slot.tab == Tab.HOME && slot.surface != Surface.STORIES) homeUnread = event.count.coerceAtLeast(0)
             }
+            is BridgeEvent.Activity -> if (slot.tab == Tab.HOME) activityDot = event.dot
             is BridgeEvent.Tray -> if (slot.surface == Surface.STORIES) onTray(event.height)
             is BridgeEvent.ScrollY -> Unit
             is BridgeEvent.Username -> onUsername(event.value)
@@ -1012,6 +1018,7 @@ class TabController(
             Log.i(DMGramApp.TAG, "Logged out")
             username = null
             homeUnread = null
+            activityDot = false
             avatar = null
             prefs.edit().remove(KEY_USERNAME).apply()
             destroy(Tab.DMS)

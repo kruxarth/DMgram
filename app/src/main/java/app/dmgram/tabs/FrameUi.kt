@@ -14,6 +14,7 @@ data class FrameUi(
     val progress: Int = 0,
     val ready: Boolean = false,
     val unread: Int = 0,
+    val activity: Boolean = false,
     val avatar: ImageBitmap? = null,
     val refreshing: Boolean = false,
     val blockedVisible: Boolean = false,

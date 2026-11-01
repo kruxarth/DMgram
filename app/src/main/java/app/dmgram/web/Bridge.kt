@@ -20,6 +20,9 @@ sealed interface BridgeEvent {
     data class Navigate(val url: String) : BridgeEvent
     data class Blocked(val url: String, val reason: String) : BridgeEvent
     data class Unread(val count: Int) : BridgeEvent
+
+    /** Instagram's header heart has something new (follow requests, likes). */
+    data class Activity(val dot: Boolean) : BridgeEvent
     data class Username(val value: String) : BridgeEvent
     class Avatar(val jpeg: ByteArray) : BridgeEvent
     data class Theme(val dark: Boolean, val background: String) : BridgeEvent
@@ -93,6 +96,7 @@ object Bridge {
                 BridgeEvent.Blocked(url, text(obj, "reason", 80) ?: "blocked")
             }
             "unread" -> obj["count"]?.jsonPrimitive?.intOrNull?.let(BridgeEvent::Unread)
+            "activity" -> obj["dot"]?.jsonPrimitive?.booleanOrNull?.let(BridgeEvent::Activity)
             "username" -> text(obj, "value", 30)?.let(BridgeEvent::Username)
             "avatar" -> obj["data"]?.jsonPrimitive?.contentOrNull?.let(AvatarData::decode)?.let(BridgeEvent::Avatar)
             "theme" -> {

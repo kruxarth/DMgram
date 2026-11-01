@@ -8,6 +8,7 @@
     <string name="tab_profile">Profile</string>
     <string name="header_search">Search</string>
     <string name="header_activity">Activity</string>
+    <string name="header_activity_new">Activity, new</string>
     <string name="header_create">New post or story</string>
     <string name="create_post">Post</string>
     <string name="create_story">Story</string>

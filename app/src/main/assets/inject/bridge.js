@@ -275,8 +275,14 @@ function publishTheme() {
 }
 
 let lastUsername = "";
+let reservedFor = null;
+let reservedNames = new Set();
 function publishUsername() {
-  const reserved = new Set(((CONFIG.rules && CONFIG.rules.reserved) || []).map((name) => String(name).toLowerCase()));
+  if (reservedFor !== CONFIG.rules) {
+    reservedFor = CONFIG.rules;
+    reservedNames = new Set(((CONFIG.rules && CONFIG.rules.reserved) || []).map((name) => String(name).toLowerCase()));
+  }
+  const reserved = reservedNames;
   const inbox = document.querySelector('a[href="/direct/inbox/"], a[href="/direct/inbox"]');
   if (!inbox) return;
   let bar = inbox.parentElement;
@@ -375,26 +381,41 @@ function publishReady() {
   const route = (window.__dmgram && window.__dmgram.route) || "";
   const key = route + location.pathname + location.search;
   if (readyKey === key) return;
-  const text = (document.body && document.body.innerText) || "";
+  // innerText forces a layout: only the routes that need the page text pay for it.
+  const longText = () => ((document.body && document.body.innerText) || "").length > 40;
   let ready = false;
   if (route === "HOME_FEED") {
     ready = !!document.querySelector("article, [aria-label^='Story by '], [aria-label*='Your story' i]");
   } else if (route === "DIRECT_INBOX" || route === "DIRECT_THREAD") {
-    ready = !!document.querySelector("[role='textbox'], textarea") || text.length > 40;
+    ready = !!document.querySelector("[role='textbox'], textarea") || longText();
   } else if (route === "PROFILE") {
     ready = !!document.querySelector("header, article, img");
   } else if (route === "SEARCH") {
     ready = !!document.querySelector("input, [role='search']");
   } else if (route === "AUTH") {
-    ready = /log in/i.test(text) || !!document.querySelector("input");
+    ready = !!document.querySelector("input") || /log in/i.test((document.body && document.body.innerText) || "");
   } else if (route === "STORY" || route === "REEL_SINGLE" || route === "POST") {
     ready = !!document.querySelector("video, article, img");
   } else if (route) {
-    ready = text.length > 40 || !!document.querySelector("article, input, video");
+    ready = !!document.querySelector("article, input, video") || longText();
   }
   if (!ready) return;
   readyKey = key;
   window.__dmgramPost({ type: "ready" });
+}
+
+// Username, avatar and the two badges walk Instagram's nav bar. The page changes on every frame while it
+// scrolls or the user types, so these run at most every SLOW_SCAN_MS, with a trailing run for the last change.
+const SLOW_SCAN_MS = 250;
+let slowScanAt = 0;
+let slowScanTimer = 0;
+function slowScan() {
+  slowScanTimer = 0;
+  slowScanAt = performance.now();
+  publishUsername();
+  publishAvatar();
+  publishUnread();
+  publishActivity();
 }
 
 let scanScheduled = false;
@@ -404,11 +425,10 @@ function scheduleScan() {
   requestAnimationFrame(() => {
     scanScheduled = false;
     publishTheme();
-    publishUsername();
-    publishAvatar();
-    publishUnread();
-    publishActivity();
     publishReady();
+    const wait = SLOW_SCAN_MS - (performance.now() - slowScanAt);
+    if (wait <= 0) slowScan();
+    else if (!slowScanTimer) slowScanTimer = setTimeout(slowScan, wait);
   });
 }
 

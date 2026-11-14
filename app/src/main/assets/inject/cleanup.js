@@ -19,16 +19,11 @@ function refreshMarkers() {
   for (const key of Object.keys(markerSets)) delete markerSets[key];
 }
 
-function conceal(node) {
+function hide(node) {
   if (!node || node.nodeType !== 1 || node === document.body || node === document.documentElement) return;
-  if (node.tagName === "MAIN" || node.tagName === "HEADER" || node.tagName === "HTML") return;
+  if (node.tagName === "MAIN" || node.tagName === "HEADER") return;
   if (node.hasAttribute("data-dmgram-hidden")) return;
   node.setAttribute("data-dmgram-hidden", "");
-}
-
-function hide(node) {
-  if (!node || node.nodeType !== 1) return;
-  conceal(node);
 }
 
 function shortText(el) {
@@ -105,7 +100,7 @@ function markChrome() {
 
 function isLabel(el) {
   const tag = el.tagName;
-  return tag === "SPAN" || tag === "A" || tag === "BUTTON" || tag === "H1" || tag === "H2" || tag === "H3" || tag === "SVG" || el.getAttribute("role") === "button";
+  return tag === "SPAN" || tag === "A" || tag === "BUTTON" || tag === "H1" || tag === "H2" || tag === "H3" || tag === "svg" || el.getAttribute("role") === "button";
 }
 
 function classifyIfLabel(el) {
@@ -381,6 +376,7 @@ if (window.__dmgram) {
   window.__dmgram.closeCreate = closeCreate;
 }
 
+const SCAN_BUDGET_MS = 1.5;
 const kidCursor = new WeakMap();
 let pending = [];
 let pendingAt = 0;
@@ -403,7 +399,8 @@ function takePending() {
 }
 
 function scanNode(node) {
-  if (!node || node.nodeType !== 1 || node.hasAttribute("data-dmgram-hidden")) return;
+  // Queued nodes Instagram has since removed (it recycles feed rows) need no scan.
+  if (!node || node.nodeType !== 1 || !node.isConnected || node.hasAttribute("data-dmgram-hidden")) return;
   if (node === document.body || node === document.documentElement) {
     for (const child of node.children) enqueue(child);
     return;
@@ -429,13 +426,16 @@ function flush() {
   markChrome();
   markTray();
   const started = performance.now();
-  let processed = 0;
-  while (pendingAt < pending.length && processed < 5 && performance.now() - started < 1) {
+  // Bounded by time only: a fixed node count let the queue fall behind a long scroll.
+  while (pendingAt < pending.length && performance.now() - started < SCAN_BUDGET_MS) {
     scanNode(takePending());
-    processed += 1;
   }
   if (pendingAt >= pending.length) {
     pending = [];
+    pendingAt = 0;
+  } else if (pendingAt > 1024) {
+    // Never fully drained during a long scroll: drop the consumed head so the array doesn't grow without end.
+    pending = pending.slice(pendingAt);
     pendingAt = 0;
   }
   if (pending.length) {

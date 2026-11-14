@@ -35,9 +35,7 @@ object InjectBundle {
         val bridge = asset(context, "inject/bridge.js")
         val router = asset(context, "inject/router.js")
         val cleanup = asset(context, "inject/cleanup.js")
-        val polish = asset(context, "inject/polish.js")
         val hide = embed(asset(context, "inject/hide.css"))
-        val rulesCss = embed(asset(context, "inject/rules.css"))
         val polishCss = embed(asset(context, "inject/polish.css"))
         return buildString {
             append("(() => {\n")
@@ -63,19 +61,15 @@ object InjectBundle {
             append(cleanup)
             append("\n} catch (error) { dmgramInjectError('cleanup', error); }\n")
             append("try {\n")
-            append(styleBoot(hide, rulesCss, polishCss))
+            append(styleBoot(hide, polishCss))
             append("\n} catch (error) { dmgramInjectError('styles', error); }\n")
-            append("try {\n")
-            append(polish)
-            append("\n} catch (error) { dmgramInjectError('polish', error); }\n")
             append("})();\n")
         }
     }
 
-    private fun styleBoot(hide: String, rules: String, polish: String): String = """
+    private fun styleBoot(hide: String, polish: String): String = """
         const dmgramStyles = [
           ["dmgram-hide", $hide],
-          ["dmgram-rules", $rules],
           ["dmgram-polish", $polish],
         ];
         const dmgramMountStyles = () => {
@@ -96,7 +90,7 @@ object InjectBundle {
           if (!root) return;
           dmgramMountStyles();
           new MutationObserver(() => {
-            if (!document.getElementById("dmgram-hide") || !document.getElementById("dmgram-rules") || !document.getElementById("dmgram-polish")) {
+            if (!document.getElementById("dmgram-hide") || !document.getElementById("dmgram-polish")) {
               dmgramMountStyles();
             }
           }).observe(root, { childList: true });
@@ -105,8 +99,12 @@ object InjectBundle {
         else document.addEventListener("DOMContentLoaded", dmgramWatchStyles, { once: true });
     """.trimIndent()
 
-    private fun asset(context: Context, path: String): String =
-        context.assets.open(path).bufferedReader().use { it.readText() }
+    /** Assets never change while the app runs; every WebView and every rules update reuses the same text. */
+    private val assets = HashMap<String, String>()
+
+    private fun asset(context: Context, path: String): String = synchronized(assets) {
+        assets.getOrPut(path) { context.assets.open(path).bufferedReader().use { it.readText() } }
+    }
 
     private fun embed(value: String): String = jsQuote(value)
 

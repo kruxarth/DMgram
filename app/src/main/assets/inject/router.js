@@ -29,6 +29,23 @@
     }
   }
 
+  // classify runs on every click and route change: compile the patterns once per rules object.
+  let compiledFor = null;
+  let compiled = null;
+
+  function compile(rules) {
+    if (compiled && compiledFor === rules) return compiled;
+    const routes = ((rules && rules.routes) || []).map((route) => ({
+      class: route.class,
+      regex: new RegExp(route.pattern),
+      hosts: (route.hosts || []).map((item) => String(item).toLowerCase()),
+    }));
+    const reserved = new Set(((rules && rules.reserved) || []).map((name) => String(name).toLowerCase()));
+    compiledFor = rules;
+    compiled = { routes, reserved };
+    return compiled;
+  }
+
   function classify(raw, rules) {
     let parsed;
     try {
@@ -55,13 +72,12 @@
     if (INSTAGRAM_HOSTS[host] && /^\/create\/.+/.test(path)) {
       return { class: "CREATE", url: target.toString(), scheme: "https" };
     }
-    const reserved = new Set(((rules && rules.reserved) || []).map((name) => String(name).toLowerCase()));
-    const routes = (rules && rules.routes) || [];
+    const { routes, reserved } = compile(rules);
     for (const route of routes) {
-      const hosts = route.hosts || [];
-      const hostOk = hosts.length === 0 ? !!INSTAGRAM_HOSTS[host] : hosts.some((item) => item.toLowerCase() === host) && (host === "instagram.com" || host.endsWith(".instagram.com"));
+      const hosts = route.hosts;
+      const hostOk = hosts.length === 0 ? !!INSTAGRAM_HOSTS[host] : hosts.indexOf(host) !== -1 && (host === "instagram.com" || host.endsWith(".instagram.com"));
       if (!hostOk) continue;
-      if (!new RegExp(route.pattern).test(path)) continue;
+      if (!route.regex.test(path)) continue;
       if (route.class === "PROFILE" && reserved.has(firstSegment(path))) continue;
       return { class: route.class, url: target.toString(), scheme: (target.protocol || "").replace(":", "").toLowerCase() };
     }

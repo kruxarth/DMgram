@@ -6,6 +6,7 @@ import android.util.Log
 import app.dmgram.BuildConfig
 import app.dmgram.DMGramApp
 import app.dmgram.net.AppHttp
+import app.dmgram.net.cappedString
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.coroutineContext
@@ -20,12 +21,17 @@ class RulesRepository(
     private val prefs: SharedPreferences,
     private val now: () -> Long = System::currentTimeMillis,
 ) {
-    fun bundled(): String = try {
-        context.assets.open("rules.default.json").bufferedReader().use { it.readText() }
-    } catch (error: IOException) {
-        Log.e(DMGramApp.TAG, "Bundled rules are missing", error)
-        """{"schema":1,"version":0,"routes":[],"reserved":[]}"""
+    private val bundledText: String by lazy {
+        try {
+            context.assets.open("rules.default.json").bufferedReader().use { it.readText() }
+        } catch (error: IOException) {
+            Log.e(DMGramApp.TAG, "Bundled rules are missing", error)
+            """{"schema":1,"version":0,"routes":[],"reserved":[]}"""
+        }
     }
+
+    /** Read once: the asset can't change while the app runs, and every app start asks for it again. */
+    fun bundled(): String = bundledText
 
     fun url(): String? {
         if (BuildConfig.DEBUG && BuildConfig.RULES_URL.isNotBlank()) return BuildConfig.RULES_URL
@@ -35,7 +41,7 @@ class RulesRepository(
     }
 
     fun due(): Boolean {
-        val target = url() ?: return false
+        if (url() == null) return false
         if (BuildConfig.DEBUG && BuildConfig.RULES_URL.isNotBlank()) return true
         return now() - prefs.getLong(KEY_FETCHED, 0L) >= INTERVAL_MS
     }
@@ -71,12 +77,16 @@ class RulesRepository(
         coroutineContext[Job]?.invokeOnCompletion { error -> if (error != null) call.cancel() }
         try {
             call.execute().use { response ->
-                val body = response.body.string()
                 if (!response.isSuccessful) {
                     Log.e(DMGramApp.TAG, "Rules fetch HTTP ${response.code}")
                     return@withContext null
                 }
+                val body = response.body.cappedString(RulesSanitizer.MAX_BYTES.toLong())
                 prefs.edit().putLong(KEY_FETCHED, now()).apply()
+                if (body == null) {
+                    Log.e(DMGramApp.TAG, "Remote rules rejected: large")
+                    return@withContext null
+                }
                 if (!acceptedRemote(body, bundledVersion, appVersionCode)) {
                     val reason = RulesSanitizer.rejection(body) ?: "version"
                     Log.e(DMGramApp.TAG, "Remote rules rejected: $reason")

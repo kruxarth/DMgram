@@ -19,14 +19,6 @@ object UserAgent {
         "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) " +
             "Chrome/$major.0.0.0 Mobile Safari/537.36"
 
-    fun reducedChromeUserAgent(context: Context): String {
-        val major = chromeMajorFrom(WebSettings.getDefaultUserAgent(context))
-            ?: throw IllegalStateException(
-                "Could not parse Chrome major version from the default user agent",
-            )
-        return reducedChromeUserAgent(major)
-    }
-
     fun clientHints(major: String): UserAgentMetadata {
         val full = "$major.0.0.0"
         val brands = listOf(

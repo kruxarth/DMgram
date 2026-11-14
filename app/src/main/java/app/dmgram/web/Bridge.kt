@@ -81,9 +81,6 @@ object Bridge {
         } catch (error: RuntimeException) {
             if (BuildConfig.DEBUG) Log.w(DMGramApp.TAG, "Ignoring malformed bridge message", error)
             return null
-        } catch (error: IllegalArgumentException) {
-            if (BuildConfig.DEBUG) Log.w(DMGramApp.TAG, "Ignoring malformed bridge message", error)
-            return null
         }
         val type = obj["type"]?.jsonPrimitive?.contentOrNull ?: return null
         return when (type) {

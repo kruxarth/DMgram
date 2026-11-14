@@ -14,7 +14,6 @@ class UpdateDecisionTest {
         val info = UpdateDecision.parse(release("v9.9.9"), "0.1.0", REPO)
         assertEquals("9.9.9", info?.version)
         assertEquals(APK, info?.apkUrl)
-        assertEquals("https://example.com/release", info?.releaseUrl)
     }
 
     @Test

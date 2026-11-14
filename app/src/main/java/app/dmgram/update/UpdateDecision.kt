@@ -39,14 +39,12 @@ object UpdateDecision {
         return UpdateInfo(
             version = remote.toString(),
             apkUrl = apk,
-            releaseUrl = release.htmlUrl,
         )
     }
 
     @Serializable
     private data class GitHubRelease(
         @SerialName("tag_name") val tagName: String = "",
-        @SerialName("html_url") val htmlUrl: String = "",
         val assets: List<GitHubAsset> = emptyList(),
     )
 

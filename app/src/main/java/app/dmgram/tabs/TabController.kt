@@ -694,7 +694,6 @@ class TabController(
         slot.progress = 0
         slot.reelLocked = false
         slot.fullscreenVideo = false
-        slot.canGoBack = false
         slot.loadError = null
         Log.i(DMGramApp.TAG, "Destroyed ${slot.tab.name} ${slot.surface.name} WebView")
     }
@@ -836,7 +835,6 @@ class TabController(
     private fun onRoute(slot: Slot, url: String, index: Int) {
         slot.url = url
         if (index >= 0) slot.historyIndex = index
-        slot.canGoBack = slot.web?.canGoBack() == true
         val decision = decide(slot.tab, url, compiled, slot.surface)
         slot.route = decision.route
         if (slot.surface == Surface.STORIES && decision.route != RouteClass.HOME_FEED) createOpen = false
@@ -942,7 +940,6 @@ class TabController(
 
     private fun onFinished(slot: Slot, url: String) {
         slot.url = url
-        slot.canGoBack = slot.web?.canGoBack() == true
         slot.route = decide(slot.tab, url, compiled, slot.surface).route
         if (slot.surface == Surface.FEED) eval(slot.web, "setStrip(${stripFor(slot)})")
         refreshing = false
@@ -1213,7 +1210,6 @@ class TabController(
         var script: ScriptHandler? = null
         var url: String = ""
         var route: RouteClass = RouteClass.UNKNOWN
-        var canGoBack: Boolean = false
         var historyIndex: Int = 0
         var stuckIndex: Int = -1
         var progress: Int = 0

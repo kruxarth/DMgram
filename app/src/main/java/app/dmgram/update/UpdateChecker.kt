@@ -5,6 +5,7 @@ import android.util.Log
 import app.dmgram.BuildConfig
 import app.dmgram.DMGramApp
 import app.dmgram.net.AppHttp
+import app.dmgram.net.cappedString
 import java.io.IOException
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
@@ -35,18 +36,15 @@ class UpdateChecker(
         if (!UpdateDecision.newerThan(version, currentVersion)) return null
         val apk = prefs.getString(KEY_APK, null)
             ?.takeIf { UpdateDecision.trustedApk(it, BuildConfig.GITHUB_REPO) } ?: return null
-        val page = prefs.getString(KEY_PAGE, null).orEmpty()
-        return UpdateInfo(version, apk, page)
+        return UpdateInfo(version, apk)
     }
 
     fun save(info: UpdateInfo?) {
         val editor = prefs.edit()
         if (info == null) {
-            editor.remove(KEY_VERSION).remove(KEY_APK).remove(KEY_PAGE)
+            editor.remove(KEY_VERSION).remove(KEY_APK)
         } else {
-            editor.putString(KEY_VERSION, info.version)
-                .putString(KEY_APK, info.apkUrl)
-                .putString(KEY_PAGE, info.releaseUrl)
+            editor.putString(KEY_VERSION, info.version).putString(KEY_APK, info.apkUrl)
         }
         editor.apply()
     }
@@ -62,12 +60,16 @@ class UpdateChecker(
         coroutineContext[Job]?.invokeOnCompletion { error -> if (error != null) call.cancel() }
         try {
             call.execute().use { response ->
-                val body = response.body.string()
                 if (!response.isSuccessful) {
                     Log.e(DMGramApp.TAG, "Update check HTTP ${response.code}")
                     return@withContext null
                 }
+                val body = response.body.cappedString(MAX_BYTES)
                 prefs.edit().putLong(KEY_FETCHED, now()).apply()
+                if (body == null) {
+                    Log.e(DMGramApp.TAG, "Update check response too large")
+                    return@withContext null
+                }
                 UpdateDecision.parse(body, currentVersion, BuildConfig.GITHUB_REPO)
             }
         } catch (error: IOException) {
@@ -81,7 +83,9 @@ class UpdateChecker(
         private const val KEY_FETCHED = "update.fetchedAt"
         private const val KEY_VERSION = "update.version"
         private const val KEY_APK = "update.apk"
-        private const val KEY_PAGE = "update.page"
         private const val INTERVAL_MS = 6L * 60L * 60L * 1000L
+
+        /** A GitHub release with a few assets is a few KB. */
+        private const val MAX_BYTES = 1024L * 1024L
     }
 }

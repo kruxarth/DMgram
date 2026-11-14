@@ -1,0 +1,1 @@
+Smoother scrolling and typing, and suggested-account buttons are hidden more reliably.
